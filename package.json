@@ -42,6 +42,7 @@
       "index.html",
       "overlay.html",
       "test-microphone.html",
+      "mac-microphone-debug.html",
       "assets/**/*",
       "node_modules/**/*"
     ],

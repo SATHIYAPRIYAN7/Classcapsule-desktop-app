@@ -109,9 +109,28 @@ app.whenReady().then(() => {
     }
   });
 
-  // Additional macOS-specific setup
+  // macOS-specific setup for microphone permissions
   if (process.platform === 'darwin') {
     console.log('Setting up macOS-specific permissions...');
+    
+    // Request microphone permissions early
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      console.log('Permission requested:', permission);
+      
+      if (permission === 'microphone') {
+        console.log('Microphone permission requested - granting automatically');
+        callback(true);
+      } else if (permission === 'media') {
+        console.log('Media permission requested - granting for microphone access');
+        callback(true);
+      } else if (['display-capture', 'desktop-capture'].includes(permission)) {
+        console.log('Screen capture permission requested - granting');
+        callback(true);
+      } else {
+        console.log('Denying permission:', permission);
+        callback(false);
+      }
+    });
   }
 
   createWindow();

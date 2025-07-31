@@ -382,33 +382,63 @@ class RecordingApp {
         try {
           console.log('Requesting microphone access...');
           
-          // First check if microphone permissions are available
-          const permissions = await navigator.permissions.query({ name: 'microphone' });
-          console.log('Microphone permission state:', permissions.state);
-          
-          if (permissions.state === 'denied') {
-            throw new Error('Microphone permission denied by user');
-          }
-          
-          this.micStream = await navigator.mediaDevices.getUserMedia({
+          // Enhanced microphone access for macOS
+          const micConstraints = {
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
-              sampleRate: 48000, // Increased from 16000 for better audio quality
-              channelCount: 2    // Stereo audio for better quality
+              sampleRate: 48000,
+              channelCount: 2
             },
             video: false
-          });
-          console.log('Microphone access granted successfully');
+          };
+          
+          // For macOS, try a more permissive approach
+          if (navigator.platform === 'MacIntel' || navigator.platform === 'MacPPC') {
+            console.log('macOS detected - using enhanced microphone access');
+            
+            // First try to get microphone access directly
+            try {
+              this.micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+              console.log('Microphone access granted successfully on macOS');
+            } catch (directError) {
+              console.log('Direct microphone access failed, trying alternative approach:', directError.message);
+              
+              // Try with more basic constraints
+              this.micStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false
+              });
+              console.log('Microphone access granted with basic constraints on macOS');
+            }
+          } else {
+            // For other platforms, use standard approach
+            this.micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+            console.log('Microphone access granted successfully');
+          }
+          
+          // Verify microphone access
+          if (this.micStream && this.micStream.getAudioTracks().length > 0) {
+            console.log(`Microphone access confirmed: ${this.micStream.getAudioTracks().length} audio track(s)`);
+          } else {
+            throw new Error('No audio tracks available from microphone');
+          }
+          
         } catch (micError) {
           console.error('Microphone access failed:', micError);
           
-          // Show specific error message for macOS
+          // Enhanced error messages for macOS
           if (micError.name === 'NotAllowedError') {
-            throw new Error('Microphone access denied. Please grant microphone permission in System Preferences > Security & Privacy > Privacy > Microphone and restart the app.');
+            if (navigator.platform === 'MacIntel' || navigator.platform === 'MacPPC') {
+              throw new Error('Microphone access denied on macOS. Please:\n1. Go to System Preferences > Security & Privacy > Privacy > Microphone\n2. Add "ClassCapsule Recorder" to the list\n3. Check the box next to the app\n4. Restart the app completely');
+            } else {
+              throw new Error('Microphone access denied. Please grant microphone permission and restart the app.');
+            }
           } else if (micError.name === 'NotFoundError') {
             throw new Error('No microphone found. Please connect a microphone and try again.');
+          } else if (micError.name === 'NotSupportedError') {
+            throw new Error('Microphone not supported or not available on this device.');
           } else {
             throw new Error(`Microphone access failed: ${micError.message}`);
           }

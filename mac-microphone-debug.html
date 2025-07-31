@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macOS Microphone Debug - ClassCapsule</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #dc3545;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #dc3545;
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffeaa7;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .code {
+            background: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .terminal {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        .copy-btn {
+            background: #6c757d;
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>macOS Microphone Debug Tool</h1>
+        <p class="subtitle">This tool helps diagnose and fix microphone permission issues on macOS for the ClassCapsule Recorder app.</p>
+        
+        <div class="step">
+            <h3>Step 1: Check Current Status</h3>
+            <p>First, let's check what permissions and capabilities are currently available.</p>
+            <button id="check-status">Check System Status</button>
+            <button id="check-permissions">Check Microphone Permissions</button>
+            <button id="list-devices">List Audio Devices</button>
+        </div>
+        
+        <div class="step">
+            <h3>Step 2: Test Microphone Access</h3>
+            <p>Try different approaches to access the microphone.</p>
+            <button id="test-basic">Test Basic Microphone Access</button>
+            <button id="test-advanced">Test Advanced Microphone Access</button>
+            <button id="test-recording">Test Audio Recording</button>
+        </div>
+        
+        <div class="step">
+            <h3>Step 3: Fix Permissions (if needed)</h3>
+            <p>If microphone access is failing, follow these steps to fix permissions.</p>
+            <button id="show-fix-steps">Show Fix Steps</button>
+            <button id="generate-commands">Generate Terminal Commands</button>
+        </div>
+        
+        <div id="status"></div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#007bff';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function addCopyButton(text, label = 'Copy') {
+            const button = document.createElement('button');
+            button.textContent = label;
+            button.className = 'copy-btn';
+            button.onclick = () => {
+                navigator.clipboard.writeText(text);
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = label, 2000);
+            };
+            return button;
+        }
+
+        // Step 1: Check Current Status
+        document.getElementById('check-status').addEventListener('click', async () => {
+            try {
+                log('=== System Status Check ===', 'info');
+                
+                // Platform info
+                log(`Platform: ${navigator.platform}`);
+                log(`User Agent: ${navigator.userAgent}`);
+                log(`MediaDevices available: ${!!navigator.mediaDevices}`);
+                log(`Permissions API available: ${!!navigator.permissions}`);
+                log(`MediaRecorder available: ${!!window.MediaRecorder}`);
+                
+                // Check for macOS specific features
+                const isMac = navigator.platform === 'MacIntel' || navigator.platform === 'MacPPC';
+                log(`macOS detected: ${isMac}`);
+                
+                if (isMac) {
+                    log('macOS-specific checks:', 'info');
+                    log(`- getUserMedia available: ${!!navigator.mediaDevices?.getUserMedia}`);
+                    log(`- enumerateDevices available: ${!!navigator.mediaDevices?.enumerateDevices}`);
+                }
+                
+                showStatus('System status check completed. Check the log for details.', 'success');
+                
+            } catch (error) {
+                log(`Error checking system status: ${error.message}`, 'error');
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('check-permissions').addEventListener('click', async () => {
+            try {
+                log('=== Microphone Permission Check ===', 'info');
+                
+                if (!navigator.permissions) {
+                    log('Permissions API not available', 'warning');
+                    showStatus('Permissions API not available in this browser', 'warning');
+                    return;
+                }
+
+                const permission = await navigator.permissions.query({ name: 'microphone' });
+                log(`Permission state: ${permission.state}`);
+                
+                let message = `Microphone permission state: ${permission.state}`;
+                if (permission.state === 'denied') {
+                    message += '<br><br><strong>To fix this on macOS:</strong><br>';
+                    message += '1. Go to System Preferences > Security & Privacy > Privacy<br>';
+                    message += '2. Select "Microphone" from the left sidebar<br>';
+                    message += '3. Add "ClassCapsule Recorder" to the list and check it<br>';
+                    message += '4. Restart the app completely';
+                }
+                
+                showStatus(message, permission.state === 'granted' ? 'success' : permission.state === 'denied' ? 'error' : 'info');
+                
+            } catch (error) {
+                log(`Error checking permissions: ${error.message}`, 'error');
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('list-devices').addEventListener('click', async () => {
+            try {
+                log('=== Audio Devices List ===', 'info');
+                
+                if (!navigator.mediaDevices?.enumerateDevices) {
+                    log('enumerateDevices not available', 'error');
+                    return;
+                }
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioDevices = devices.filter(device => device.kind === 'audioinput');
+                
+                log(`Found ${audioDevices.length} audio input device(s):`);
+                audioDevices.forEach((device, index) => {
+                    log(`  ${index + 1}. ${device.label || 'Unknown device'} (${device.deviceId})`);
+                });
+                
+                if (audioDevices.length === 0) {
+                    log('No audio input devices found!', 'error');
+                    showStatus('No microphone devices detected. Please connect a microphone.', 'error');
+                } else {
+                    showStatus(`Found ${audioDevices.length} audio input device(s).`, 'success');
+                }
+                
+            } catch (error) {
+                log(`Error listing devices: ${error.message}`, 'error');
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Step 2: Test Microphone Access
+        document.getElementById('test-basic').addEventListener('click', async () => {
+            try {
+                log('=== Testing Basic Microphone Access ===', 'info');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: false
+                });
+                
+                log('Basic microphone access granted successfully');
+                log(`Audio tracks: ${stream.getAudioTracks().length}`);
+                
+                if (stream.getAudioTracks().length > 0) {
+                    const track = stream.getAudioTracks()[0];
+                    const settings = track.getSettings();
+                    log(`Track settings: ${JSON.stringify(settings, null, 2)}`);
+                }
+                
+                // Stop the stream
+                stream.getTracks().forEach(track => track.stop());
+                
+                showStatus('Basic microphone access test passed!', 'success');
+                
+            } catch (error) {
+                log(`Basic microphone access failed: ${error.message}`, 'error');
+                log(`Error name: ${error.name}`, 'error');
+                
+                let message = `Basic microphone access failed: ${error.message}`;
+                if (error.name === 'NotAllowedError') {
+                    message += '<br><br><strong>To fix this:</strong><br>';
+                    message += '1. Go to System Preferences > Security & Privacy > Privacy > Microphone<br>';
+                    message += '2. Add "ClassCapsule Recorder" to the list<br>';
+                    message += '3. Check the box next to the app<br>';
+                    message += '4. Restart the app completely';
+                }
+                
+                showStatus(message, 'error');
+            }
+        });
+
+        document.getElementById('test-advanced').addEventListener('click', async () => {
+            try {
+                log('=== Testing Advanced Microphone Access ===', 'info');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 2
+                    },
+                    video: false
+                });
+                
+                log('Advanced microphone access granted successfully');
+                log(`Audio tracks: ${stream.getAudioTracks().length}`);
+                
+                if (stream.getAudioTracks().length > 0) {
+                    const track = stream.getAudioTracks()[0];
+                    const settings = track.getSettings();
+                    log(`Advanced track settings: ${JSON.stringify(settings, null, 2)}`);
+                }
+                
+                // Stop the stream
+                stream.getTracks().forEach(track => track.stop());
+                
+                showStatus('Advanced microphone access test passed!', 'success');
+                
+            } catch (error) {
+                log(`Advanced microphone access failed: ${error.message}`, 'error');
+                log(`Error name: ${error.name}`, 'error');
+                
+                let message = `Advanced microphone access failed: ${error.message}`;
+                if (error.name === 'NotAllowedError') {
+                    message += '<br><br><strong>To fix this:</strong><br>';
+                    message += '1. Go to System Preferences > Security & Privacy > Privacy > Microphone<br>';
+                    message += '2. Add "ClassCapsule Recorder" to the list<br>';
+                    message += '3. Check the box next to the app<br>';
+                    message += '4. Restart the app completely';
+                }
+                
+                showStatus(message, 'error');
+            }
+        });
+
+        document.getElementById('test-recording').addEventListener('click', async () => {
+            try {
+                log('=== Testing Audio Recording ===', 'info');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 2
+                    },
+                    video: false
+                });
+                
+                log('Starting audio recording test...');
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                    log(`Audio chunk received: ${event.data.size} bytes`);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    log('Audio recording stopped');
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    log(`Final audio blob size: ${blob.size} bytes`);
+                    showStatus(`Audio recording test completed! Recorded ${blob.size} bytes of audio.`, 'success');
+                };
+                
+                mediaRecorder.start();
+                log('Audio recording started');
+                
+                // Stop recording after 3 seconds
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                log(`Audio recording test failed: ${error.message}`, 'error');
+                showStatus(`Audio recording test failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Step 3: Fix Permissions
+        document.getElementById('show-fix-steps').addEventListener('click', () => {
+            const steps = `
+                <h3>How to Fix Microphone Permissions on macOS:</h3>
+                
+                <div class="step">
+                    <h4>Method 1: System Preferences (Recommended)</h4>
+                    <ol>
+                        <li>Open <strong>System Preferences</strong> (or <strong>System Settings</strong> on newer macOS)</li>
+                        <li>Click on <strong>Security & Privacy</strong> (or <strong>Privacy & Security</strong>)</li>
+                        <li>Click the <strong>Privacy</strong> tab</li>
+                        <li>Select <strong>Microphone</strong> from the left sidebar</li>
+                        <li>Click the lock icon to make changes (enter your password)</li>
+                        <li>Click the <strong>+</strong> button to add an application</li>
+                        <li>Navigate to your <strong>Applications</strong> folder</li>
+                        <li>Select <strong>ClassCapsule Recorder</strong> and click <strong>Open</strong></li>
+                        <li>Make sure the checkbox next to <strong>ClassCapsule Recorder</strong> is checked</li>
+                        <li>Close the app completely and reopen it</li>
+                    </ol>
+                </div>
+                
+                <div class="step">
+                    <h4>Method 2: Terminal Commands (Advanced)</h4>
+                    <p>If the app doesn't appear in the Microphone list, use these terminal commands:</p>
+                    <div class="terminal">
+                        # Find the app bundle<br>
+                        find /Applications -name "ClassCapsule Recorder.app" -type d<br><br>
+                        
+                        # Grant microphone permission (replace with actual path)<br>
+                        sudo tccutil add Microphone /Applications/ClassCapsule\\ Recorder.app<br><br>
+                        
+                        # Grant screen recording permission<br>
+                        sudo tccutil add ScreenCapture /Applications/ClassCapsule\\ Recorder.app
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <h4>Method 3: Reset Permissions (Last Resort)</h4>
+                    <p>If nothing else works, you can reset all permissions and start fresh:</p>
+                    <div class="terminal">
+                        # Reset all microphone permissions (use with caution)<br>
+                        sudo tccutil reset Microphone<br><br>
+                        
+                        # Reset all screen recording permissions (use with caution)<br>
+                        sudo tccutil reset ScreenCapture
+                    </div>
+                    <p><strong>Warning:</strong> This will reset permissions for ALL apps, not just ClassCapsule Recorder.</p>
+                </div>
+            `;
+            
+            showStatus(steps, 'info');
+        });
+
+        document.getElementById('generate-commands').addEventListener('click', () => {
+            const commands = `# Find the app bundle
+find /Applications -name "ClassCapsule Recorder.app" -type d
+
+# Grant microphone permission (replace with actual path)
+sudo tccutil add Microphone /Applications/ClassCapsule\\ Recorder.app
+
+# Grant screen recording permission
+sudo tccutil add ScreenCapture /Applications/ClassCapsule\\ Recorder.app
+
+# Check current permissions
+tccutil list Microphone
+tccutil list ScreenCapture
+
+# Check app entitlements
+codesign -d --entitlements :- "/Applications/ClassCapsule Recorder.app"`;
+
+            const terminalDiv = document.createElement('div');
+            terminalDiv.className = 'terminal';
+            terminalDiv.innerHTML = commands.replace(/\n/g, '<br>');
+            
+            const copyButton = addCopyButton(commands, 'Copy Commands');
+            terminalDiv.appendChild(copyButton);
+            
+            showStatus('Terminal commands generated. Click "Copy Commands" to copy them to clipboard.', 'info');
+            statusDiv.appendChild(terminalDiv);
+        });
+
+        // Log initial state
+        log('macOS Microphone Debug Tool loaded', 'info');
+        log(`Platform: ${navigator.platform}`, 'info');
+        log(`User agent: ${navigator.userAgent}`, 'info');
+    </script>
+</body>
+</html> 
