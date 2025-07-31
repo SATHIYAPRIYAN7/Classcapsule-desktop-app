@@ -1,0 +1,33 @@
+{
+    "manifest_version": 3,
+    "name": "ClassCapsule",
+    "version": "1.0",
+    "permissions": [
+      "tabCapture",
+      "offscreen",
+      "downloads",
+      "desktopCapture",
+      "system.display",
+      "activeTab",
+      "scripting",
+      "storage",
+      "microphone"
+    ],
+    "host_permissions": [
+      "http://localhost:3000/*",
+      "https://class-capsule-2.onrender.com/*"
+    ],
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "48": "logo-class-capsule.png"
+      }
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "web_accessible_resources": [{
+      "resources": ["offscreen.html"],
+      "matches": ["<all_urls>"]
+    }]
+  }

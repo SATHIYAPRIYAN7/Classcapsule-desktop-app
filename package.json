@@ -1,0 +1,66 @@
+{
+  "name": "classcapsule-recorder",
+  "version": "2.0.0",
+  "description": "ClassCapsule Screen Recorder - Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac --universal",
+    "build:linux": "electron-builder --linux",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": [
+    "electron",
+    "screen-recorder",
+    "classcapsule",
+    "desktop-app"
+  ],
+  "author": "ClassCapsule Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "electron-store": "^8.1.0",
+    "form-data": "^4.0.4"
+  },
+  "build": {
+    "appId": "com.classcapsule.recorder",
+    "productName": "ClassCapsule Recorder",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "renderer.js",
+      "preload.js",
+      "index.html",
+      "overlay.html",
+      "test-microphone.html",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/logo-class-capsule.png"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "assets/logo-class-capsule.png",
+      "publish": null,
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/logo-class-capsule.png"
+    }
+  }
+}

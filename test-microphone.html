@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microphone Test - ClassCapsule</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Microphone Permission Test</h1>
+        <p>This page helps test microphone permissions on macOS for the ClassCapsule Recorder app.</p>
+        
+        <div>
+            <button id="test-permission">Test Microphone Permission</button>
+            <button id="request-microphone">Request Microphone Access</button>
+            <button id="test-audio">Test Audio Recording</button>
+        </div>
+        
+        <div id="status"></div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        document.getElementById('test-permission').addEventListener('click', async () => {
+            try {
+                log('Testing microphone permission...');
+                
+                if (!navigator.permissions) {
+                    showStatus('Permissions API not available in this browser', 'error');
+                    return;
+                }
+
+                const permission = await navigator.permissions.query({ name: 'microphone' });
+                log(`Permission state: ${permission.state}`);
+                
+                let message = `Microphone permission state: ${permission.state}`;
+                if (permission.state === 'denied') {
+                    message += '<br><br>To fix this on macOS:<br>1. Go to System Preferences > Security & Privacy > Privacy<br>2. Select "Microphone" from the left sidebar<br>3. Add this app to the list and check it<br>4. Restart the app';
+                }
+                
+                showStatus(message, permission.state === 'granted' ? 'success' : permission.state === 'denied' ? 'error' : 'info');
+                
+            } catch (error) {
+                log(`Error testing permission: ${error.message}`);
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('request-microphone').addEventListener('click', async () => {
+            try {
+                log('Requesting microphone access...');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 2
+                    },
+                    video: false
+                });
+                
+                log('Microphone access granted successfully');
+                log(`Audio tracks: ${stream.getAudioTracks().length}`);
+                log(`Track settings: ${JSON.stringify(stream.getAudioTracks()[0]?.getSettings(), null, 2)}`);
+                
+                showStatus('Microphone access granted successfully!', 'success');
+                
+                // Stop the stream after testing
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (error) {
+                log(`Microphone access failed: ${error.message}`);
+                log(`Error name: ${error.name}`);
+                
+                let message = `Microphone access failed: ${error.message}`;
+                if (error.name === 'NotAllowedError') {
+                    message += '<br><br>To fix this on macOS:<br>1. Go to System Preferences > Security & Privacy > Privacy<br>2. Select "Microphone" from the left sidebar<br>3. Add this app to the list and check it<br>4. Restart the app';
+                }
+                
+                showStatus(message, 'error');
+            }
+        });
+
+        document.getElementById('test-audio').addEventListener('click', async () => {
+            try {
+                log('Testing audio recording...');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 2
+                    },
+                    video: false
+                });
+                
+                log('Starting audio recording test...');
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                    log(`Audio chunk received: ${event.data.size} bytes`);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    log('Audio recording stopped');
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    log(`Final audio blob size: ${blob.size} bytes`);
+                    showStatus(`Audio recording test completed! Recorded ${blob.size} bytes of audio.`, 'success');
+                };
+                
+                mediaRecorder.start();
+                log('Audio recording started');
+                
+                // Stop recording after 3 seconds
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                log(`Audio recording test failed: ${error.message}`);
+                showStatus(`Audio recording test failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Log initial state
+        log('Microphone test page loaded');
+        log(`User agent: ${navigator.userAgent}`);
+        log(`Platform: ${navigator.platform}`);
+        log(`MediaDevices available: ${!!navigator.mediaDevices}`);
+        log(`Permissions API available: ${!!navigator.permissions}`);
+    </script>
+</body>
+</html> 

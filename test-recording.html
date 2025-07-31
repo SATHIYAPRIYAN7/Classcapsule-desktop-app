@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recording Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4CAF50;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #f44336;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid #2196F3;
+        }
+        .platform-info {
+            background: rgba(255, 193, 7, 0.3);
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔴 Screen Recording Test</h1>
+        
+        <div class="platform-info">
+            <h3>Platform Information</h3>
+            <p><strong>Platform:</strong> <span id="platform"></span></p>
+            <p><strong>Browser:</strong> <span id="browser"></span></p>
+            <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Browser Compatibility Test</h3>
+            <button class="button" onclick="testBrowserCompatibility()">Test Browser Support</button>
+            <div id="compatibility-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎤 Audio/Video Permissions Test</h3>
+            <button class="button" onclick="testPermissions()">Test Permissions</button>
+            <div id="permissions-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📹 Screen Recording Test</h3>
+            <button class="button" onclick="testScreenRecording()">Test Screen Recording</button>
+            <div id="recording-status"></div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Troubleshooting Instructions</h3>
+            
+            <h4>For Windows Users:</h4>
+            <ul>
+                <li>Ensure your audio drivers are properly installed and working</li>
+                <li>Check that your microphone is not muted in Windows settings</li>
+                <li>Allow screen sharing when prompted by the browser</li>
+                <li>If audio fails, try using only screen audio (disable microphone)</li>
+            </ul>
+
+            <h4>For Mac Users:</h4>
+            <ul>
+                <li>Go to System Preferences > Security & Privacy > Privacy > Screen Recording</li>
+                <li>Add Chrome/Edge to the list of allowed applications</li>
+                <li>Go to System Preferences > Security & Privacy > Privacy > Microphone</li>
+                <li>Add Chrome/Edge to the microphone permissions list</li>
+                <li>Restart your browser after granting permissions</li>
+            </ul>
+
+            <h4>General Tips:</h4>
+            <ul>
+                <li>Use Chrome or Edge browser for best compatibility</li>
+                <li>Ensure you have a stable internet connection</li>
+                <li>Close other applications that might be using audio/video</li>
+                <li>Try refreshing the page if permissions are denied</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Display platform information
+        document.getElementById('platform').textContent = navigator.platform;
+        document.getElementById('browser').textContent = navigator.userAgent.includes('Chrome') ? 'Chrome' : 
+                                                      navigator.userAgent.includes('Edge') ? 'Edge' : 
+                                                      navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Other';
+        document.getElementById('userAgent').textContent = navigator.userAgent.substring(0, 100) + '...';
+
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function testBrowserCompatibility() {
+            const status = [];
+            
+            // Test MediaRecorder support
+            if (typeof MediaRecorder !== 'undefined') {
+                status.push('✅ MediaRecorder API supported');
+            } else {
+                status.push('❌ MediaRecorder API not supported');
+            }
+
+            // Test getDisplayMedia support
+            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                status.push('✅ Screen capture API supported');
+            } else {
+                status.push('❌ Screen capture API not supported');
+            }
+
+            // Test getUserMedia support
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                status.push('✅ Audio/Video capture API supported');
+            } else {
+                status.push('❌ Audio/Video capture API not supported');
+            }
+
+            // Test WebM support
+            const webmSupported = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ||
+                                 MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ||
+                                 MediaRecorder.isTypeSupported('video/webm');
+            
+            if (webmSupported) {
+                status.push('✅ WebM video format supported');
+            } else {
+                status.push('❌ WebM video format not supported');
+            }
+
+            showStatus('compatibility-status', status.join('<br>'), 'success');
+        }
+
+        async function testPermissions() {
+            try {
+                showStatus('permissions-status', 'Testing permissions...', 'info');
+
+                // Test microphone permission
+                let micStatus = '❌ Microphone access denied';
+                try {
+                    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    micStatus = '✅ Microphone access granted';
+                    micStream.getTracks().forEach(track => track.stop());
+                } catch (error) {
+                    console.log('Microphone test failed:', error);
+                }
+
+                // Test screen capture permission
+                let screenStatus = '❌ Screen capture access denied';
+                try {
+                    const screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: true, 
+                        audio: true 
+                    });
+                    screenStatus = '✅ Screen capture access granted';
+                    screenStream.getTracks().forEach(track => track.stop());
+                } catch (error) {
+                    console.log('Screen capture test failed:', error);
+                }
+
+                showStatus('permissions-status', `${micStatus}<br>${screenStatus}`, 'success');
+            } catch (error) {
+                showStatus('permissions-status', `Error testing permissions: ${error.message}`, 'error');
+            }
+        }
+
+        async function testScreenRecording() {
+            try {
+                showStatus('recording-status', 'Starting test recording...', 'info');
+
+                // Get screen capture
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always",
+                        displaySurface: "monitor"
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    }
+                });
+
+                showStatus('recording-status', 'Screen capture obtained, testing recording...', 'info');
+
+                // Create media recorder
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 
+                                'video/webm;codecs=vp9,opus' : 'video/webm';
+
+                const mediaRecorder = new MediaRecorder(screenStream, { mimeType });
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    showStatus('recording-status', 
+                        `✅ Test recording successful!<br>
+                         Size: ${(blob.size / 1024).toFixed(2)} KB<br>
+                         Duration: ${(chunks.length * 0.5).toFixed(1)} seconds<br>
+                         <a href="${url}" download="test-recording.webm" style="color: #4CAF50;">Download Test Recording</a>`, 
+                        'success');
+                    
+                    // Clean up
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                };
+
+                // Start recording for 3 seconds
+                mediaRecorder.start(500);
+                setTimeout(() => {
+                    mediaRecorder.stop();
+                    screenStream.getTracks().forEach(track => track.stop());
+                }, 3000);
+
+            } catch (error) {
+                showStatus('recording-status', `❌ Test recording failed: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html> 
