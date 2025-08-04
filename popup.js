@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize
   initializeUI();
+  updateRecordingModeUI(); // Set initial UI state
   checkAuthStatus();
 
   function initializeUI() {
@@ -48,6 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
     startRecordingBtn.addEventListener('click', handleStartRecording);
     stopRecordingBtn.addEventListener('click', handleStopRecording);
     logoutBtn.addEventListener('click', handleLogout);
+
+    // Recording mode change handler
+    const recordingModeInputs = document.querySelectorAll('input[name="recording-mode"]');
+    recordingModeInputs.forEach(input => {
+      input.addEventListener('change', updateRecordingModeUI);
+    });
 
     // Enter key handlers
     emailInput.addEventListener('keypress', (e) => {
@@ -141,9 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      console.log('Making API request to:', 'https://class-capsule-2.onrender.com/auth/login');
+      console.log('Making API request to:', `${window.APP_CONFIG.API_BASE_URL}/auth/login`);
       
-      const response = await fetch('https://class-capsule-2.onrender.com/auth/login', {
+              const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -261,6 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
       setButtonLoading(startRecordingBtn, true);
       statusText.textContent = "Starting recording...";
       
+      // Get selected recording mode
+      const recordingMode = document.querySelector('input[name="recording-mode"]:checked').value;
+      console.log('Selected recording mode:', recordingMode);
+      
       // Inject content script
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -270,7 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // Wait a moment for the script to initialize
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      await chrome.tabs.sendMessage(tab.id, { type: 'start-recording' });
+      await chrome.tabs.sendMessage(tab.id, { 
+        type: 'start-recording',
+        recordingMode: recordingMode
+      });
       
       // Update UI
       isRecording = true;
@@ -279,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stopRecordingBtn.classList.remove('hidden');
       statusIndicator.classList.add('recording');
       statusDot.classList.add('recording');
-      statusText.textContent = 'Recording in progress...';
+      statusText.textContent = recordingMode === 'audio-only' ? 'Recording audio...' : 'Recording in progress...';
       timer.classList.remove('hidden');
       
       // Start timer
@@ -288,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTimer();
       }, 1000);
       
-      showRecordingNotification('Recording started!', 'success');
+      showRecordingNotification(`Recording started! (${recordingMode === 'audio-only' ? 'Audio Only' : 'Video + Audio'})`, 'success');
       
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -408,6 +422,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function updateRecordingModeUI() {
+    const selectedMode = document.querySelector('input[name="recording-mode"]:checked').value;
+    const startButton = document.getElementById('start-recording');
+    
+    // Update button text based on selected mode
+    if (selectedMode === 'audio-only') {
+      startButton.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,10C19,13.53 16.39,16.44 13,16.9V20H15A1,1 0 0,1 16,21A1,1 0 0,1 15,22H9A1,1 0 0,1 8,21A1,1 0 0,1 9,20H11V16.9C7.61,16.44 5,13.53 5,10H7A5,5 0 0,0 12,15A5,5 0 0,0 17,10H19Z"/>
+        </svg>
+        Start Audio Recording
+      `;
+    } else {
+      startButton.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M8.5,8.64L13.77,12L8.5,15.36V8.64M6.5,5V19L17.5,12"/>
+        </svg>
+        Start Recording
+      `;
+    }
   }
 
   function showRecordingNotification(message, type) {

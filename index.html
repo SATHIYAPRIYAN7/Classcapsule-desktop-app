@@ -148,10 +148,27 @@
       padding: 0 20px;
       position: relative;
       z-index: 2;
-      overflow-y: hidden;
+      overflow-y: auto;
       max-width: 600px;
       margin: 0 auto;
       width: 100%;
+      max-height: calc(100vh - 200px);
+      scrollbar-width: thin;
+      scrollbar-color: #ef4444 #f3f4f6;
+    }
+    
+    .main-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .main-content::-webkit-scrollbar-track {
+      background: #f3f4f6;
+      border-radius: 3px;
+    }
+    
+    .main-content::-webkit-scrollbar-thumb {
+      background-color: #ef4444;
+      border-radius: 3px;
     }
     
     .auth-section {
@@ -274,6 +291,9 @@
       background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
       box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     
     .btn-success:hover {
@@ -430,6 +450,9 @@
       width: 18px;
       height: 18px;
       fill: currentColor;
+      flex-shrink: 0;
+      vertical-align: middle;
+      transform: translateY(-1px);
     }
     
     .message {
@@ -461,20 +484,164 @@
       display: block;
     }
     
+    .authenticated .upload-status-section {
+      display: block;
+    }
+    
+    /* Recording controls are hidden by default and shown when authenticated */
     .recording-controls {
       display: none;
+    }
+    
+    .upload-status-section {
+      display: none;
+    }
+    
+    .recording-controls .secondary-controls {
+      display: flex;
+    }
+    
+    /* Upload Status Section */
+    .upload-status-section {
+      background: #f9fafb;
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 20px;
+      border: 2px solid #f3f4f6;
+    }
+    
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .section-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .btn-clear {
+      background: none;
+      border: none;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-clear:hover {
+      background: #fef2f2;
+    }
+    
+    .upload-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .upload-item {
+      background: white;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      border: 1px solid #e5e7eb;
+      transition: all 0.2s ease;
+    }
+    
+    .upload-item:hover {
+      border-color: #d1d5db;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .upload-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .upload-filename {
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .upload-status {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    
+    .upload-status.uploading {
+      background: #fef3c7;
+      color: #d97706;
+    }
+    
+    .upload-status.success {
+      background: #dcfce7;
+      color: #166534;
+    }
+    
+    .upload-status.error {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    
+    .upload-progress {
+      width: 100%;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    
+    .upload-progress-bar {
+      height: 100%;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    
+    .upload-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #6b7280;
+    }
+    
+    .upload-time {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    
+    .upload-size {
+      font-size: 11px;
+      color: #6b7280;
     }
     
     .audio-controls {
       background: #f9fafb;
       border-radius: 20px;
       padding: 24px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       border: 2px solid #f3f4f6;
     }
     
     .control-group {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     
     .control-group:last-child {
@@ -484,7 +651,7 @@
     .control-label {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       cursor: pointer;
       font-weight: 600;
       color: #374151;
@@ -496,10 +663,10 @@
     }
     
     .checkbox-custom {
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       border: 2px solid #d1d5db;
-      border-radius: 8px;
+      border-radius: 6px;
       background: white;
       position: relative;
       transition: all 0.3s ease;
@@ -518,26 +685,86 @@
       left: 50%;
       transform: translate(-50%, -50%);
       color: white;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: bold;
     }
     
     .label-text {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       color: #374151;
     }
     
     .control-description {
-      font-size: 13px;
+      font-size: 12px;
       color: #6b7280;
-      margin-left: 40px;
-      line-height: 1.5;
+      margin-left: 32px;
+      line-height: 1.4;
     }
     
     .control-label:hover .checkbox-custom {
       border-color: #ef4444;
       transform: scale(1.05);
+    }
+    
+    /* Recording Mode Selector Styles - Compact Version */
+    .recording-mode-selector {
+      background: #f9fafb;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 2px solid #f3f4f6;
+    }
+    
+    .mode-options {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    
+    .mode-options .control-label {
+      flex: 1;
+      margin-bottom: 0;
+      padding: 8px 12px;
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      transition: all 0.2s ease;
+    }
+    
+    .mode-options .control-label:hover {
+      border-color: #ef4444;
+    }
+    
+    .mode-options input[type="radio"] {
+      display: none;
+    }
+    
+    .mode-options .checkbox-custom {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+    
+    .mode-options input[type="radio"]:checked + .checkbox-custom {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-color: #ef4444;
+    }
+    
+    .mode-options input[type="radio"]:checked + .checkbox-custom::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: white;
+      border-radius: 50%;
+    }
+    
+    .mode-options input[type="radio"]:checked ~ .label-text {
+      color: #ef4444;
     }
     
     .modal-overlay {
@@ -644,6 +871,18 @@
       .modal-buttons {
         flex-direction: column;
       }
+      
+      .recording-mode-selector {
+        padding: 12px;
+      }
+      
+      .mode-options {
+        gap: 8px;
+      }
+      
+      .mode-options .control-label {
+        padding: 6px 10px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -669,7 +908,12 @@
       }
       
       .audio-controls {
-        padding: 20px;
+        padding: 16px;
+      }
+      
+      .control-description {
+        margin-left: 28px;
+        font-size: 11px;
       }
     }
   </style>
@@ -782,6 +1026,27 @@
           </div>
         </div>
         
+        <!-- Compact Recording Mode Selector -->
+        <div class="recording-mode-selector">
+          <div class="control-group">
+            <label class="control-label">
+              <span class="label-text">Recording Mode:</span>
+            </label>
+            <div class="mode-options">
+              <label class="control-label">
+                <input type="radio" name="recording-mode" value="video-audio" checked>
+                <span class="checkbox-custom"></span>
+                <span class="label-text">Video + Audio</span>
+              </label>
+              <label class="control-label">
+                <input type="radio" name="recording-mode" value="audio-only">
+                <span class="checkbox-custom"></span>
+                <span class="label-text">Audio Only</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
         <div class="controls-grid">
           <button id="start-recording" class="btn btn-success">
             <svg class="icon" viewBox="0 0 24 24">
@@ -813,11 +1078,18 @@
             </button>
           </div>
         </div>
-        <!-- <div style="text-align: center; margin-top: 20px; color: red;">
-          <a href="https://class-capsule.netlify.app/signup" target="_blank">Dont have an account? <span>Sign up</span></a>
-     </div> -->
       </div>
-     
+      
+      <!-- Upload Status Section -->
+      <div class="upload-status-section">
+        <div class="section-header">
+          <h3>Latest Recordings</h3>
+          <button id="clear-uploads" class="btn-clear">Clear History</button>
+        </div>
+        <div id="upload-list" class="upload-list">
+          <!-- Upload items will be dynamically added here -->
+        </div>
+      </div>
     </div>
     
     <div class="footer">
@@ -837,6 +1109,7 @@
     </div>
   </div>
 
+  <script src="renderer-config.js"></script>
   <script src="renderer.js"></script>
 </body>
-</html> 
+</html>

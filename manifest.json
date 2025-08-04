@@ -15,7 +15,7 @@
     ],
     "host_permissions": [
       "http://localhost:3000/*",
-      "https://class-capsule-2.onrender.com/*"
+              "https://api-dev-classcapsule.nfndev.com/*"
     ],
     "action": {
       "default_popup": "popup.html",

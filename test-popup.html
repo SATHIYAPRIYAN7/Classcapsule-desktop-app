@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Popup Test</title>
+    <style>
+        body {
+            width: 380px;
+            min-height: 500px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .background-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            pointer-events: none;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 20px 16px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .app-title {
+            color: black;
+            font-size: 18px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .app-subtitle {
+            color: black;
+            font-size: 12px;
+            font-weight: 400;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 0 20px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .recording-controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: block !important;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            color: #2d5a2d;
+            border: 1px solid rgba(45, 90, 45, 0.1);
+        }
+        
+        .controls-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 2px solid #e9ecef;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .secondary-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
+        .footer {
+            padding: 16px 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        
+        /* Recording Mode Selector Styles */
+        .recording-mode-selector {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: block !important;
+        }
+        
+        .mode-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .mode-options {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .mode-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .mode-option:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .mode-option input[type="radio"] {
+            margin: 0;
+            accent-color: #667eea;
+        }
+        
+        .mode-option input[type="radio"]:checked + .mode-text {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .mode-text {
+            font-size: 13px;
+            color: #333;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="background-pattern"></div>
+        
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo">CC</div>
+                <div>
+                    <div class="app-title">ClassCapsule</div>
+                    <div class="app-subtitle">Recorder v2.0</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- Recording Controls -->
+            <div class="recording-controls" id="recording-controls">
+                <div class="status-indicator" id="status-indicator">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Ready to record</span>
+                    <span class="timer hidden" id="timer">00:00</span>
+                </div>
+                
+                <div class="controls-grid">
+                    <!-- Recording Mode Selector -->
+                    <div class="recording-mode-selector">
+                        <label class="mode-label">Recording Mode:</label>
+                        <div class="mode-options">
+                            <label class="mode-option">
+                                <input type="radio" name="recording-mode" value="video-audio" checked>
+                                <span class="mode-text">Video + Audio</span>
+                            </label>
+                            <label class="mode-option">
+                                <input type="radio" name="recording-mode" value="audio-only">
+                                <span class="mode-text">Audio Only</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button id="start-recording" class="btn btn-success">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M8.5,8.64L13.77,12L8.5,15.36V8.64M6.5,5V19L17.5,12"/>
+                        </svg>
+                        Start Recording
+                    </button>
+                    
+                    <button id="stop-recording" class="btn btn-danger hidden">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M18,18H6V6H18V18Z"/>
+                        </svg>
+                        Stop Recording
+                    </button>
+                    
+                    <div class="secondary-controls">
+                        <button id="settings" class="btn btn-secondary">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                            </svg>
+                            Settings
+                        </button>
+                        
+                        <button id="logout" class="btn btn-secondary">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M16,17V14H9V10H16V7L21,12L16,17M14,2A2,2 0 0,1 16,4V6H14V4H5V20H14V18H16V20A2,2 0 0,1 14,22H5A2,2 0 0,1 3,20V4A2,2 0 0,1 5,2H14Z"/>
+                            </svg>
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>ClassCapsule Recorder v2.0 • © 2024 ClassCapsule</p>
+        </div>
+    </div>
+
+    <script>
+        // Simple test script
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Test popup loaded');
+            
+            // Check if recording mode selector exists
+            const modeSelector = document.querySelector('.recording-mode-selector');
+            console.log('Recording mode selector found:', !!modeSelector);
+            
+            if (modeSelector) {
+                console.log('Mode selector HTML:', modeSelector.innerHTML);
+            }
+            
+            // Test radio button functionality
+            const radioButtons = document.querySelectorAll('input[name="recording-mode"]');
+            console.log('Radio buttons found:', radioButtons.length);
+            
+            radioButtons.forEach((radio, index) => {
+                radio.addEventListener('change', () => {
+                    console.log('Radio button changed:', radio.value);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

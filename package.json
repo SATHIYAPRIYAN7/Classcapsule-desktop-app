@@ -43,6 +43,8 @@
       "overlay.html",
       "test-microphone.html",
       "mac-microphone-debug.html",
+      "renderer-config.js",
+      "config.js",
       "assets/**/*",
       "node_modules/**/*"
     ],
@@ -57,7 +59,9 @@
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "category": "public.app-category.productivity"
+      "extendInfo": "Info.plist",
+      "category": "public.app-category.productivity",
+      "gatekeeperAssess": false
     },
     "linux": {
       "target": "AppImage",

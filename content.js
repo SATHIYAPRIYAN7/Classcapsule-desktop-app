@@ -62,17 +62,18 @@ class RecordingManager {
       return navigator.platform.toUpperCase().indexOf('WIN') >= 0;
     }
 
-    async startRecording() {
+    async startRecording(recordingMode = 'video-audio') {
       if (this.isRecording) {
         console.log('Already recording, ignoring start command');
         return;
       }
       
-      console.log('Starting recording process...');
+      console.log('Starting recording process...', { recordingMode });
       
       try {
         this.isRecording = true;
         this.explicitlyStarted = true;
+        this.recordingMode = recordingMode;
         this.updateUI();
 
         // Mac-specific: Start with simpler approach
@@ -96,6 +97,13 @@ class RecordingManager {
     async startRecordingMac() {
       // Mac-specific: Simplified approach without complex audio mixing
       console.log('Requesting screen capture for Mac...');
+      
+      if (this.recordingMode === 'audio-only') {
+        // Audio-only recording for Mac
+        console.log('Starting audio-only recording on Mac...');
+        await this.startAudioOnlyRecordingMac();
+        return;
+      }
       
       // Step 1: Get screen capture with audio (simplified for Mac)
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -181,9 +189,64 @@ class RecordingManager {
       };
     }
 
+    async startAudioOnlyRecordingMac() {
+      // Audio-only recording for Mac
+      console.log('Starting audio-only recording on Mac...');
+      
+      // Get microphone audio
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          sampleRate: 48000
+        },
+        video: false
+      });
+      
+      console.log('Microphone access granted for audio-only recording on Mac');
+      
+      // Create audio-only stream
+      const audioStream = this.micStream;
+      
+      // Create media recorder for audio-only
+      const mimeType = this.getAudioOnlyMimeType();
+      console.log('Using audio-only MIME type:', mimeType);
+      
+      this.mediaRecorder = new MediaRecorder(audioStream, {
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000
+      });
+      
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          this.recordedChunks.push(e.data);
+          console.log('Audio chunk received on Mac:', e.data.size, 'bytes');
+        }
+      };
+      
+      this.mediaRecorder.onerror = (event) => {
+        console.error('Audio MediaRecorder error on Mac:', event);
+        this.showError('Audio recording error occurred on Mac');
+      };
+      
+      this.mediaRecorder.onstart = () => {
+        console.log('Audio MediaRecorder started successfully on Mac');
+      };
+      
+      this.mediaRecorder.start(2000); // Collect chunks every 2 seconds
+    }
+
     async startRecordingStandard() {
       // Standard approach for Windows and other platforms
       console.log('Requesting screen capture...');
+      
+      if (this.recordingMode === 'audio-only') {
+        // Audio-only recording for standard platforms
+        console.log('Starting audio-only recording...');
+        await this.startAudioOnlyRecordingStandard();
+        return;
+      }
+      
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: "always",
@@ -267,6 +330,53 @@ class RecordingManager {
       };
     }
 
+    async startAudioOnlyRecordingStandard() {
+      // Audio-only recording for standard platforms
+      console.log('Starting audio-only recording...');
+      
+      // Get microphone audio
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        },
+        video: false
+      });
+      
+      console.log('Microphone access granted for audio-only recording');
+      
+      // Create audio-only stream
+      const audioStream = this.micStream;
+      
+      // Create media recorder for audio-only
+      const mimeType = this.getAudioOnlyMimeType();
+      console.log('Using audio-only MIME type:', mimeType);
+      
+      this.mediaRecorder = new MediaRecorder(audioStream, {
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000
+      });
+      
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          this.recordedChunks.push(e.data);
+          console.log('Audio chunk received:', e.data.size, 'bytes');
+        }
+      };
+      
+      this.mediaRecorder.onerror = (event) => {
+        console.error('Audio MediaRecorder error:', event);
+        this.showError('Audio recording error occurred');
+      };
+      
+      this.mediaRecorder.onstart = () => {
+        console.log('Audio MediaRecorder started successfully');
+      };
+      
+      this.mediaRecorder.start(1000); // Collect chunks every 1 second
+    }
+
     getMacSupportedMimeType() {
       // Mac-optimized codec selection
       const types = [
@@ -324,6 +434,25 @@ class RecordingManager {
       return 'video/webm'; // Fallback
     }
 
+    getAudioOnlyMimeType() {
+      const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+      ];
+      
+      for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          return type;
+        }
+      }
+      
+      return 'audio/webm'; // Fallback
+    }
+
     async createMixedAudioStream() {
       try {
         this.audioContext = new AudioContext();
@@ -363,15 +492,24 @@ class RecordingManager {
       if (this.isMac()) {
         // Mac-specific error handling
         if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
+          if (this.recordingMode === 'audio-only') {
+            return 'Microphone permission denied on Mac. Please:\n1. Go to System Preferences > Security & Privacy > Privacy > Microphone\n2. Add Chrome/Edge to the list\n3. Restart your browser';
+          }
           return 'Screen recording permission denied on Mac. Please:\n1. Go to System Preferences > Security & Privacy > Privacy > Screen Recording\n2. Add Chrome/Edge to the list\n3. Restart your browser';
         }
         if (errorMessage.includes('NotSupportedError')) {
+          if (this.recordingMode === 'audio-only') {
+            return 'Audio recording not supported on Mac. Please use Chrome or Edge browser.';
+          }
           return 'Screen recording not supported on Mac. Please use Chrome or Edge browser.';
         }
         if (errorMessage.includes('audio') || errorMessage.includes('AudioContext')) {
           return 'Audio recording failed on Mac. Please:\n1. Check microphone permissions in System Preferences > Security & Privacy > Privacy > Microphone\n2. Try recording without microphone first\n3. Restart browser after granting permissions';
         }
         if (errorMessage.includes('Failed to start recording') || errorMessage.includes('getDisplayMedia')) {
+          if (this.recordingMode === 'audio-only') {
+            return 'Failed to start audio recording on Mac. Please:\n1. Check microphone permissions\n2. Try refreshing the page\n3. Ensure microphone is not being used by another app';
+          }
           return 'Failed to start recording on Mac. Please:\n1. Ensure Chrome/Edge has screen recording permission\n2. Try refreshing the page\n3. Check if any other app is using screen recording';
         }
         if (errorMessage.includes('MediaRecorder') || errorMessage.includes('codec')) {
@@ -382,15 +520,24 @@ class RecordingManager {
           return 'Audio recording failed. Please ensure your audio drivers are working and try again.';
         }
         if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
+          if (this.recordingMode === 'audio-only') {
+            return 'Microphone permission denied. Please allow microphone access when prompted.';
+          }
           return 'Screen recording permission denied. Please allow screen sharing when prompted.';
         }
       }
       
       // Generic error messages
       if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
+        if (this.recordingMode === 'audio-only') {
+          return 'Microphone permission denied. Please allow microphone access when prompted.';
+        }
         return 'Permission denied. Please allow screen recording when prompted.';
       }
       if (errorMessage.includes('NotSupportedError')) {
+        if (this.recordingMode === 'audio-only') {
+          return 'Audio recording not supported in this browser. Please use Chrome or Edge.';
+        }
         return 'Screen recording not supported in this browser. Please use Chrome or Edge.';
       }
       
@@ -408,19 +555,26 @@ class RecordingManager {
           let blob, filename, fallbackUrl;
           
           try {
-            blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            // Determine file type based on recording mode
+            const isAudioOnly = this.recordingMode === 'audio-only';
+            const mimeType = isAudioOnly ? 'audio/webm' : 'video/webm';
+            const fileExtension = isAudioOnly ? 'webm' : 'webm';
+            
+            blob = new Blob(this.recordedChunks, { type: mimeType });
             
             if (blob.size === 0) {
               throw new Error('No recording data available');
             }
             
-            filename = `lecture-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+            filename = `lecture-${new Date().toISOString().replace(/[:.]/g, '-')}.${fileExtension}`;
             fallbackUrl = URL.createObjectURL(blob);
             
             console.log('Recording completed:', {
               blobSize: blob.size,
               filename: filename,
-              chunks: this.recordedChunks.length
+              chunks: this.recordedChunks.length,
+              recordingMode: this.recordingMode,
+              isAudioOnly: isAudioOnly
             });
             
             // Get auth token from background script
@@ -454,8 +608,9 @@ class RecordingManager {
               type: 'upload-recording',
               blobData: base64,
               filename: filename,
-              apiUrl: 'https://class-capsule-2.onrender.com',
-              authToken: authToken || null
+              apiUrl: window.APP_CONFIG.API_BASE_URL,
+              authToken: authToken || null,
+              recordingMode: this.recordingMode || 'video-audio'
             }).catch(error => {
               console.error('Failed to send message to background script:', error);
               throw new Error('Failed to communicate with extension background script');
@@ -566,8 +721,8 @@ class RecordingManager {
       console.log('Content script received message:', message.type);
       
       if (message.type === 'start-recording') {
-        console.log('Starting recording...');
-        window.recordingManager.startRecording();
+        console.log('Starting recording...', { recordingMode: message.recordingMode });
+        window.recordingManager.startRecording(message.recordingMode || 'video-audio');
       } else if (message.type === 'stop-recording') {
         console.log('Stopping recording...');
         window.recordingManager.stopRecording();

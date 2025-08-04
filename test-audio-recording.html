@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recording Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .status.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+        
+        .status.info {
+            background: rgba(33, 150, 243, 0.2);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+        }
+        
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: red;
+            margin-right: 8px;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Audio Recording Test</h1>
+        
+        <div class="test-section">
+            <h3>Test Audio-Only Recording</h3>
+            <p>This test verifies that the extension can record audio-only content using the microphone.</p>
+            
+            <button id="test-audio-btn" class="btn">Test Audio Recording</button>
+            <button id="stop-audio-btn" class="btn hidden">Stop Audio Recording</button>
+            
+            <div id="audio-status" class="status info hidden">
+                <span id="audio-status-text">Ready to test audio recording</span>
+                <span id="audio-timer" class="hidden">00:00</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Video + Audio Recording</h3>
+            <p>This test verifies that the extension can record both video and audio content.</p>
+            
+            <button id="test-video-btn" class="btn">Test Video + Audio Recording</button>
+            <button id="stop-video-btn" class="btn hidden">Stop Video Recording</button>
+            
+            <div id="video-status" class="status info hidden">
+                <span id="video-status-text">Ready to test video recording</span>
+                <span id="video-timer" class="hidden">00:00</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Results</h3>
+            <div id="test-results">
+                <p>Click the buttons above to test the recording functionality.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioRecorder = null;
+        let videoRecorder = null;
+        let audioTimer = null;
+        let videoTimer = null;
+        let audioSeconds = 0;
+        let videoSeconds = 0;
+
+        // Audio recording test
+        document.getElementById('test-audio-btn').addEventListener('click', async () => {
+            try {
+                const btn = document.getElementById('test-audio-btn');
+                const stopBtn = document.getElementById('stop-audio-btn');
+                const status = document.getElementById('audio-status');
+                const statusText = document.getElementById('audio-status-text');
+                const timer = document.getElementById('audio-timer');
+                
+                btn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                status.classList.remove('hidden', 'info', 'error');
+                status.classList.add('info');
+                statusText.innerHTML = '<span class="recording-indicator"></span>Starting audio recording...';
+                
+                // Get microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    },
+                    video: false
+                });
+                
+                // Create MediaRecorder for audio
+                const mimeType = getAudioMimeType();
+                audioRecorder = new MediaRecorder(stream, {
+                    mimeType: mimeType,
+                    audioBitsPerSecond: 128000
+                });
+                
+                const chunks = [];
+                
+                audioRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunks.push(e.data);
+                    }
+                };
+                
+                audioRecorder.onstart = () => {
+                    statusText.innerHTML = '<span class="recording-indicator"></span>Recording audio...';
+                    timer.classList.remove('hidden');
+                    startAudioTimer();
+                    addTestResult('✅ Audio recording started successfully');
+                };
+                
+                audioRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `audio-test-${Date.now()}.webm`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    statusText.innerHTML = 'Audio recording completed and downloaded';
+                    timer.classList.add('hidden');
+                    stopAudioTimer();
+                    addTestResult('✅ Audio recording completed and saved');
+                };
+                
+                audioRecorder.start(1000);
+                
+            } catch (error) {
+                console.error('Audio recording failed:', error);
+                document.getElementById('audio-status-text').textContent = `Error: ${error.message}`;
+                document.getElementById('audio-status').classList.remove('info');
+                document.getElementById('audio-status').classList.add('error');
+                addTestResult(`❌ Audio recording failed: ${error.message}`);
+            }
+        });
+
+        // Stop audio recording
+        document.getElementById('stop-audio-btn').addEventListener('click', () => {
+            if (audioRecorder && audioRecorder.state === 'recording') {
+                audioRecorder.stop();
+                audioRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            document.getElementById('test-audio-btn').classList.remove('hidden');
+            document.getElementById('stop-audio-btn').classList.add('hidden');
+        });
+
+        // Video recording test
+        document.getElementById('test-video-btn').addEventListener('click', async () => {
+            try {
+                const btn = document.getElementById('test-video-btn');
+                const stopBtn = document.getElementById('stop-video-btn');
+                const status = document.getElementById('video-status');
+                const statusText = document.getElementById('video-status-text');
+                const timer = document.getElementById('video-timer');
+                
+                btn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                status.classList.remove('hidden', 'info', 'error');
+                status.classList.add('info');
+                statusText.innerHTML = '<span class="recording-indicator"></span>Starting video recording...';
+                
+                // Get screen capture with audio
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always",
+                        displaySurface: "monitor"
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    }
+                });
+                
+                // Create MediaRecorder for video
+                const mimeType = getVideoMimeType();
+                videoRecorder = new MediaRecorder(stream, {
+                    mimeType: mimeType,
+                    videoBitsPerSecond: 2500000,
+                    audioBitsPerSecond: 128000
+                });
+                
+                const chunks = [];
+                
+                videoRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunks.push(e.data);
+                    }
+                };
+                
+                videoRecorder.onstart = () => {
+                    statusText.innerHTML = '<span class="recording-indicator"></span>Recording video...';
+                    timer.classList.remove('hidden');
+                    startVideoTimer();
+                    addTestResult('✅ Video recording started successfully');
+                };
+                
+                videoRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `video-test-${Date.now()}.webm`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    statusText.innerHTML = 'Video recording completed and downloaded';
+                    timer.classList.add('hidden');
+                    stopVideoTimer();
+                    addTestResult('✅ Video recording completed and saved');
+                };
+                
+                videoRecorder.start(1000);
+                
+            } catch (error) {
+                console.error('Video recording failed:', error);
+                document.getElementById('video-status-text').textContent = `Error: ${error.message}`;
+                document.getElementById('video-status').classList.remove('info');
+                document.getElementById('video-status').classList.add('error');
+                addTestResult(`❌ Video recording failed: ${error.message}`);
+            }
+        });
+
+        // Stop video recording
+        document.getElementById('stop-video-btn').addEventListener('click', () => {
+            if (videoRecorder && videoRecorder.state === 'recording') {
+                videoRecorder.stop();
+                videoRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            document.getElementById('test-video-btn').classList.remove('hidden');
+            document.getElementById('stop-video-btn').classList.add('hidden');
+        });
+
+        function getAudioMimeType() {
+            const types = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4;codecs=mp4a.40.2',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+                'audio/ogg'
+            ];
+            
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    return type;
+                }
+            }
+            
+            return 'audio/webm';
+        }
+
+        function getVideoMimeType() {
+            const types = [
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ];
+            
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    return type;
+                }
+            }
+            
+            return 'video/webm';
+        }
+
+        function startAudioTimer() {
+            audioSeconds = 0;
+            audioTimer = setInterval(() => {
+                audioSeconds++;
+                document.getElementById('audio-timer').textContent = formatTime(audioSeconds);
+            }, 1000);
+        }
+
+        function stopAudioTimer() {
+            if (audioTimer) {
+                clearInterval(audioTimer);
+                audioTimer = null;
+            }
+        }
+
+        function startVideoTimer() {
+            videoSeconds = 0;
+            videoTimer = setInterval(() => {
+                videoSeconds++;
+                document.getElementById('video-timer').textContent = formatTime(videoSeconds);
+            }, 1000);
+        }
+
+        function stopVideoTimer() {
+            if (videoTimer) {
+                clearInterval(videoTimer);
+                videoTimer = null;
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function addTestResult(message) {
+            const results = document.getElementById('test-results');
+            const result = document.createElement('p');
+            result.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(result);
+        }
+    </script>
+</body>
+</html> 

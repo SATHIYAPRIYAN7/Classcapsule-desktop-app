@@ -408,6 +408,63 @@
     .recording-controls {
       display: none;
     }
+    
+    /* Recording Mode Selector Styles */
+    .recording-mode-selector {
+      margin-bottom: 16px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: block;
+    }
+    
+    .mode-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+      background: transparent;
+    }
+    
+    .mode-options {
+      display: flex;
+      gap: 16px;
+    }
+    
+    .mode-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+    
+    .mode-option:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .mode-option input[type="radio"] {
+      margin: 0;
+      accent-color: #667eea;
+    }
+    
+    .mode-option input[type="radio"]:checked + .mode-text {
+      color: #667eea;
+      font-weight: 600;
+    }
+    
+    .mode-text {
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -483,11 +540,26 @@
         </div>
         
         <div class="controls-grid">
+          <!-- Recording Mode Selector -->
+          <div class="recording-mode-selector">
+            <label class="mode-label">Recording Mode:</label>
+            <div class="mode-options">
+              <label class="mode-option">
+                <input type="radio" name="recording-mode" value="video-audio" checked>
+                <span class="mode-text">Video + Audio</span>
+              </label>
+              <label class="mode-option">
+                <input type="radio" name="recording-mode" value="audio-only">
+                <span class="mode-text">Audio Only</span>
+              </label>
+            </div>
+          </div>
+          
           <button id="start-recording" class="btn btn-success">
             <svg class="icon" viewBox="0 0 24 24">
               <path d="M8.5,8.64L13.77,12L8.5,15.36V8.64M6.5,5V19L17.5,12"/>
             </svg>
-            Start Recording
+            Start Recording2
           </button>
           
           <button id="stop-recording" class="btn btn-danger hidden">
@@ -521,6 +593,7 @@
     </div>
   </div>
 
+  <script src="renderer-config.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

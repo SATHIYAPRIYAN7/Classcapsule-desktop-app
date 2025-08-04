@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session } = require('elect
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+const config = require('./config');
 const store = new Store();
 
 let mainWindow;
@@ -14,9 +15,9 @@ let recordingSeconds = 0;
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 420,
-    height: 700,
+    height: 760,
     minWidth: 400,
-    minHeight: 700,
+    minHeight: 760,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -385,7 +386,7 @@ ipcMain.handle('start-multipart-upload', async (event, { filename, fileSize, con
     const https = require('https');
     const http = require('http');
     
-    const url = new URL('https://class-capsule-2.onrender.com/recordings/start-multipart-upload');
+    const url = new URL(`${config.API_BASE_URL}/recordings/start-multipart-upload`);
     const client = url.protocol === 'https:' ? https : http;
 
     const requestData = JSON.stringify({
@@ -466,7 +467,7 @@ ipcMain.handle('generate-presigned-urls', async (event, { filename, uploadId, fi
     const https = require('https');
     const http = require('http');
     
-    const url = new URL('https://class-capsule-2.onrender.com/recordings/generate-presigned-url');
+    const url = new URL(`${config.API_BASE_URL}/recordings/generate-presigned-url`);
     const client = url.protocol === 'https:' ? https : http;
 
     const requestData = JSON.stringify({
@@ -612,7 +613,7 @@ ipcMain.handle('complete-multipart-upload', async (event, { filename, uploadId, 
     const https = require('https');
     const http = require('http');
     
-    const url = new URL('https://class-capsule-2.onrender.com/recordings/complete-multipart-upload');
+    const url = new URL(`${config.API_BASE_URL}/recordings/complete-multipart-upload`);
     const client = url.protocol === 'https:' ? https : http;
 
     const requestData = JSON.stringify({

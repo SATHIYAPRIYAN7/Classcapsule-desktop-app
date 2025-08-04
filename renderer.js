@@ -14,6 +14,8 @@ class RecordingApp {
     this.initializeElectronListeners();
     this.checkAuthStatus();
     this.loadAudioPreferences();
+    this.loadRecordingModePreference();
+    this.loadUploadHistory();
     this.testScreenRecordingAPIs();
   }
 
@@ -50,6 +52,10 @@ class RecordingApp {
     // Audio control elements
     this.systemAudioToggle = document.getElementById('system-audio-toggle');
     this.micAudioToggle = document.getElementById('mic-audio-toggle');
+    
+    // Upload status elements
+    this.uploadList = document.getElementById('upload-list');
+    this.clearUploadsBtn = document.getElementById('clear-uploads');
   }
 
   initializeEventListeners() {
@@ -94,6 +100,22 @@ class RecordingApp {
     this.micAudioToggle.addEventListener('change', () => {
       this.saveAudioPreferences();
     });
+    
+    // Recording mode selector event listeners
+    const recordingModeInputs = document.querySelectorAll('input[name="recording-mode"]');
+    recordingModeInputs.forEach(input => {
+      input.addEventListener('change', () => {
+        this.updateRecordingModeUI();
+        this.saveRecordingModePreference();
+      });
+    });
+    
+    // Upload status event listeners
+    if (this.clearUploadsBtn) {
+      this.clearUploadsBtn.addEventListener('click', () => {
+        this.clearUploadHistory();
+      });
+    }
     
     // Window control event listeners
     const minimizeBtn = document.getElementById('minimize-btn');
@@ -214,7 +236,7 @@ class RecordingApp {
     try {
       console.log('Attempting login for:', email);
       
-      const response = await fetch('https://class-capsule-2.onrender.com/auth/login', {
+      const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -291,16 +313,32 @@ class RecordingApp {
   async handleStartRecording() {
     try {
       this.setButtonLoading(this.startRecordingBtn, true);
-      this.statusText.textContent = "Starting recording...";
       
-      // Get screen sources first
-      const sourcesResult = await window.electronAPI.getScreenSources();
-      if (!sourcesResult.success) {
-        throw new Error(sourcesResult.error || 'Failed to get screen sources');
+      // Get selected recording mode
+      const recordingMode = this.getSelectedRecordingMode();
+      console.log('Selected recording mode:', recordingMode);
+      
+      if (recordingMode === 'audio-only') {
+        this.statusText.textContent = "Starting audio recording...";
+      } else {
+        this.statusText.textContent = "Starting recording...";
+      }
+      
+      // Get screen sources first (needed for video recording and system audio)
+      let sourcesResult = null;
+      if (recordingMode !== 'audio-only' || this.systemAudioToggle.checked) {
+        sourcesResult = await window.electronAPI.getScreenSources();
+        if (!sourcesResult.success) {
+          throw new Error(sourcesResult.error || 'Failed to get screen sources');
+        }
       }
 
-      // Start the actual screen recording
-      await this.startScreenRecording(sourcesResult.sources);
+      // Start the actual recording
+      if (recordingMode === 'audio-only') {
+        await this.startAudioOnlyRecording(sourcesResult?.sources);
+      } else {
+        await this.startScreenRecording(sourcesResult.sources);
+      }
 
       // Start recording process in main process
       const startResult = await window.electronAPI.startRecording();
@@ -310,17 +348,25 @@ class RecordingApp {
 
       // Update UI
       this.isRecording = true;
+      console.log('Updating UI for recording state...');
+      console.log('Start button before:', this.startRecordingBtn.classList.contains('hidden'));
+      console.log('Stop button before:', this.stopRecordingBtn.classList.contains('hidden'));
+      
       this.startRecordingBtn.classList.add('hidden');
       this.stopRecordingBtn.classList.remove('hidden');
+      
+      console.log('Start button after:', this.startRecordingBtn.classList.contains('hidden'));
+      console.log('Stop button after:', this.stopRecordingBtn.classList.contains('hidden'));
+      
       this.statusIndicator.classList.add('recording');
       this.statusDot.classList.add('recording');
-      this.statusText.textContent = 'Recording in progress...';
+      this.statusText.textContent = recordingMode === 'audio-only' ? 'Recording audio...' : 'Recording in progress...';
       this.timer.classList.remove('hidden');
       
       // Show recording overlay
       this.showRecordingOverlay();
       
-      this.showRecordingNotification('Recording started!', 'success');
+      this.showRecordingNotification(`Recording started! (${recordingMode === 'audio-only' ? 'Audio Only' : 'Video + Audio'})`, 'success');
       
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -516,6 +562,374 @@ class RecordingApp {
     }
   }
 
+  async startAudioOnlyRecording(sources = null) {
+    try {
+      console.log('Starting audio-only recording...');
+
+      // Get system audio using a simpler approach for audio-only mode
+      this.screenStream = null;
+      if (this.systemAudioToggle.checked) {
+        try {
+          console.log('Requesting system audio for audio-only recording...');
+          
+          // If we have screen sources, try using them first (like video+audio mode)
+          if (sources && sources.length > 0) {
+            console.log('Using screen sources for system audio capture...');
+            const source = sources[0];
+            console.log('Selected source:', source.name);
+            
+            try {
+              // Try using getDisplayMedia first (same as video+audio mode)
+              this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                  width: { ideal: 1280, max: 1920 },
+                  height: { ideal: 720, max: 1080 },
+                  frameRate: { ideal: 24, max: 30 }
+                },
+                audio: this.systemAudioToggle.checked
+              });
+              console.log('Using getDisplayMedia successfully for audio-only');
+            } catch (displayMediaError) {
+              console.log('getDisplayMedia failed, trying getUserMedia with source ID');
+              
+              // Fallback to getUserMedia with source ID (same as video+audio mode)
+              this.screenStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: source.id
+                  }
+                },
+                video: {
+                  mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: source.id
+                  }
+                }
+              });
+            }
+          } else {
+            // Fallback to multiple approaches if no sources available
+            console.log('No screen sources available, trying multiple approaches...');
+            
+            // Try multiple approaches for system audio capture
+            const approaches = [
+              // Approach 1: Minimal video with audio
+              {
+                video: { width: 1, height: 1, frameRate: 1 },
+                audio: true
+              },
+              // Approach 2: No video, audio only (if supported)
+              {
+                video: false,
+                audio: true
+              },
+              // Approach 3: Standard video with audio
+              {
+                video: {
+                  width: { ideal: 1280, max: 1920 },
+                  height: { ideal: 720, max: 1080 },
+                  frameRate: { ideal: 24, max: 30 }
+                },
+                audio: true
+              }
+            ];
+            
+            let success = false;
+            for (let i = 0; i < approaches.length; i++) {
+              try {
+                console.log(`Trying system audio approach ${i + 1}...`);
+                this.screenStream = await navigator.mediaDevices.getDisplayMedia(approaches[i]);
+                
+                if (this.screenStream && this.screenStream.getAudioTracks().length > 0) {
+                  console.log(`System audio access granted with approach ${i + 1}`);
+                  console.log('System audio tracks:', this.screenStream.getAudioTracks().length);
+                  success = true;
+                  break;
+                } else {
+                  console.warn(`Approach ${i + 1} failed - no audio tracks`);
+                  this.screenStream = null;
+                }
+              } catch (approachError) {
+                console.warn(`Approach ${i + 1} failed:`, approachError.message);
+                this.screenStream = null;
+              }
+            }
+            
+            if (!success) {
+              console.error('All system audio capture approaches failed');
+              this.screenStream = null;
+            }
+          }
+        } catch (screenError) {
+          console.warn('System audio access denied for audio-only recording:', screenError);
+          this.screenStream = null;
+          
+          // Provide more specific error information
+          if (screenError.name === 'NotAllowedError') {
+            console.error('System audio permission denied. User needs to grant screen sharing permission.');
+          } else if (screenError.name === 'NotSupportedError') {
+            console.error('System audio not supported on this platform/browser.');
+          } else {
+            console.error('System audio capture failed:', screenError.message);
+          }
+        }
+      }
+
+      // Get microphone audio using the same approach as video+audio mode
+      this.micStream = null;
+      if (this.micAudioToggle.checked) {
+        try {
+          console.log('Requesting microphone access for audio-only recording...');
+          
+          // Use the same microphone constraints as video+audio mode
+          const micConstraints = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 2
+            },
+            video: false
+          };
+          
+          // For macOS, try a more permissive approach (same as video+audio mode)
+          if (navigator.platform === 'MacIntel' || navigator.platform === 'MacPPC') {
+            console.log('macOS detected - using enhanced microphone access');
+            
+            // First try to get microphone access directly
+            try {
+              this.micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+              console.log('Microphone access granted successfully on macOS');
+            } catch (directError) {
+              console.log('Direct microphone access failed, trying alternative approach:', directError.message);
+              
+              // Try with more basic constraints
+              this.micStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false
+              });
+              console.log('Microphone access granted with basic constraints on macOS');
+            }
+          } else {
+            // For other platforms, use standard approach
+            this.micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+            console.log('Microphone access granted successfully');
+          }
+          
+          // Verify microphone access
+          if (this.micStream && this.micStream.getAudioTracks().length > 0) {
+            console.log(`Microphone access confirmed: ${this.micStream.getAudioTracks().length} audio track(s)`);
+          } else {
+            throw new Error('No audio tracks available from microphone');
+          }
+          
+        } catch (micError) {
+          console.error('Microphone access failed:', micError);
+          
+          // Enhanced error messages for macOS
+          if (micError.name === 'NotAllowedError') {
+            if (navigator.platform === 'MacIntel' || navigator.platform === 'MacPPC') {
+              throw new Error('Microphone access denied on macOS. Please:\n1. Go to System Preferences > Security & Privacy > Privacy > Microphone\n2. Add "ClassCapsule Recorder" to the list\n3. Check the box next to the app\n4. Restart the app completely');
+            } else {
+              throw new Error('Microphone access denied. Please grant microphone permission and restart the app.');
+            }
+          } else if (micError.name === 'NotFoundError') {
+            throw new Error('No microphone found. Please connect a microphone and try again.');
+          } else if (micError.name === 'NotSupportedError') {
+            throw new Error('Microphone not supported or not available on this device.');
+          } else {
+            throw new Error(`Microphone access failed: ${micError.message}`);
+          }
+        }
+      } else {
+        console.log('Microphone recording disabled by user');
+      }
+
+      // Check if we have at least one audio source
+      console.log('Audio source check:');
+      console.log('- System audio enabled:', this.systemAudioToggle.checked);
+      console.log('- Microphone enabled:', this.micAudioToggle.checked);
+      console.log('- Screen stream available:', !!this.screenStream);
+      console.log('- Mic stream available:', !!this.micStream);
+      
+      if (this.screenStream) {
+        console.log('- Screen stream audio tracks:', this.screenStream.getAudioTracks().length);
+      }
+      if (this.micStream) {
+        console.log('- Mic stream audio tracks:', this.micStream.getAudioTracks().length);
+      }
+      
+      // Check if we have at least one working audio source
+      const hasScreenAudio = this.screenStream && this.screenStream.getAudioTracks().length > 0;
+      const hasMicAudio = this.micStream && this.micStream.getAudioTracks().length > 0;
+      
+      console.log('- Has screen audio:', hasScreenAudio);
+      console.log('- Has mic audio:', hasMicAudio);
+      
+      if (!hasScreenAudio && !hasMicAudio) {
+        // Provide more specific error message based on what was attempted
+        if (this.systemAudioToggle.checked && this.micAudioToggle.checked) {
+          throw new Error('Both system audio and microphone capture failed. Please check your permissions and try again. If you only want to record microphone, disable system audio and try again.');
+        } else if (this.systemAudioToggle.checked) {
+          throw new Error('System audio capture failed. Please check your screen sharing permissions and try again. You can also try enabling microphone as an alternative.');
+        } else if (this.micAudioToggle.checked) {
+          throw new Error('Microphone capture failed. Please check your microphone permissions and try again.');
+        } else {
+          throw new Error('No audio sources available. Please enable system audio or microphone in the settings.');
+        }
+      }
+
+      // Create audio context for mixing (same as video+audio mode)
+      const audioContext = new AudioContext();
+      const mixedAudio = audioContext.createMediaStreamDestination();
+      
+      // Add screen audio if available and enabled (same as video+audio mode)
+      if (this.systemAudioToggle.checked && this.screenStream && this.screenStream.getAudioTracks().length > 0) {
+        const screenSource = audioContext.createMediaStreamSource(this.screenStream);
+        screenSource.connect(mixedAudio);
+        console.log('System audio added to mix');
+      } else {
+        console.log('System audio disabled by user or not available');
+      }
+      
+      // Add microphone audio if available and enabled (same as video+audio mode)
+      if (this.micAudioToggle.checked && this.micStream && this.micStream.getAudioTracks().length > 0) {
+        const micSource = audioContext.createMediaStreamSource(this.micStream);
+        micSource.connect(mixedAudio);
+        console.log('Microphone audio added to mix');
+      } else {
+        console.log('Microphone audio disabled by user or not available');
+      }
+
+      // Get the mixed audio stream
+      const finalAudioStream = mixedAudio.stream;
+      
+      console.log('Final audio stream created with:', {
+        audioTracks: finalAudioStream.getAudioTracks().length,
+        systemAudioEnabled: this.systemAudioToggle.checked,
+        micAudioEnabled: this.micAudioToggle.checked
+      });
+      
+      // Verify we have at least one audio track in the final stream
+      if (finalAudioStream.getAudioTracks().length === 0) {
+        console.error('No audio tracks in final stream - this should not happen');
+        throw new Error('Failed to create audio stream. Please try again.');
+      }
+      
+      // Create media recorder for audio-only
+      const mimeType = this.getAudioOnlyMimeType();
+      console.log('Using audio-only MIME type:', mimeType);
+      
+      this.mediaRecorder = new MediaRecorder(finalAudioStream, {
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000
+      });
+      
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          this.recordedChunks.push(e.data);
+          console.log('Audio chunk received:', e.data.size, 'bytes');
+        }
+      };
+      
+      this.mediaRecorder.onerror = (event) => {
+        console.error('Audio MediaRecorder error:', event);
+        throw new Error('Audio recording error occurred');
+      };
+      
+      this.mediaRecorder.onstart = () => {
+        console.log('Audio MediaRecorder started successfully');
+      };
+      
+      this.mediaRecorder.onstop = async () => {
+        await this.handleRecordingComplete();
+      };
+      
+      this.mediaRecorder.start(1000); // Collect chunks every 1 second
+      
+      console.log('Audio-only recording started successfully with mixed audio sources');
+    } catch (error) {
+      console.error('Audio-only recording failed:', error);
+      throw error;
+    }
+  }
+
+  getAudioOnlyMimeType() {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/ogg'
+    ];
+    
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    
+    return 'audio/webm'; // Fallback
+  }
+
+  async createMixedAudioStream() {
+    try {
+      console.log('Creating mixed audio stream...');
+      
+      // Create audio context for mixing
+      const audioContext = new AudioContext();
+      const mixedAudio = audioContext.createMediaStreamDestination();
+      
+      let audioSourcesAdded = 0;
+      
+      // Add system audio if available
+      if (this.screenStream && this.screenStream.getAudioTracks().length > 0) {
+        try {
+          const screenSource = audioContext.createMediaStreamSource(this.screenStream);
+          screenSource.connect(mixedAudio);
+          console.log('System audio added to mix');
+          audioSourcesAdded++;
+        } catch (screenError) {
+          console.warn('Failed to add system audio to mix:', screenError);
+        }
+      }
+      
+      // Add microphone audio if available
+      if (this.micStream && this.micStream.getAudioTracks().length > 0) {
+        try {
+          const micSource = audioContext.createMediaStreamSource(this.micStream);
+          micSource.connect(mixedAudio);
+          console.log('Microphone audio added to mix');
+          audioSourcesAdded++;
+        } catch (micError) {
+          console.warn('Failed to add microphone audio to mix:', micError);
+        }
+      }
+
+      if (audioSourcesAdded === 0) {
+        throw new Error('No audio sources could be added to the mix');
+      }
+
+      console.log(`Mixed audio stream created successfully with ${audioSourcesAdded} audio sources`);
+      return mixedAudio.stream;
+    } catch (error) {
+      console.error('Failed to create mixed audio stream:', error);
+      // Fallback to microphone only if mixing fails
+      if (this.micStream && this.micStream.getAudioTracks().length > 0) {
+        console.log('Falling back to microphone only');
+        return this.micStream;
+      } else if (this.screenStream && this.screenStream.getAudioTracks().length > 0) {
+        console.log('Falling back to system audio only');
+        return this.screenStream;
+      } else {
+        throw new Error('No audio sources available for mixing');
+      }
+    }
+  }
+
   async handleRecordingComplete() {
     try {
       if (this.recordedChunks.length === 0) {
@@ -523,13 +937,28 @@ class RecordingApp {
         return;
       }
 
-      const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-      const filename = `lecture-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      // Determine file type based on recording mode
+      const recordingMode = this.getSelectedRecordingMode();
+      const isAudioOnly = recordingMode === 'audio-only';
+      const mimeType = isAudioOnly ? 'audio/webm' : 'video/webm';
+      const fileExtension = isAudioOnly ? 'webm' : 'webm';
+      
+      const blob = new Blob(this.recordedChunks, { type: mimeType });
+      const filename = `lecture-${new Date().toISOString().replace(/[:.]/g, '-')}.${fileExtension}`;
 
       console.log('Recording completed, preparing to upload...', {
         blobSize: blob.size,
         filename: filename,
-        sizeMB: (blob.size / 1024 / 1024).toFixed(2)
+        sizeMB: (blob.size / 1024 / 1024).toFixed(2),
+        recordingMode: recordingMode,
+        isAudioOnly: isAudioOnly
+      });
+
+      // Add upload item to UI
+      const uploadId = this.addUploadItem({
+        filename: filename,
+        size: blob.size,
+        recordingMode: recordingMode
       });
 
       // Get auth token
@@ -537,6 +966,7 @@ class RecordingApp {
       const authToken = authResult.success ? authResult.token : null;
 
       if (!authToken) {
+        this.updateUploadProgress(uploadId, 0, 'error');
         throw new Error('No authentication token available. Please login first.');
       }
 
@@ -546,11 +976,11 @@ class RecordingApp {
       if (fileSizeMB < 10) {
         // Small file - use regular upload
         console.log('Using regular upload for small file');
-        await this.uploadSmallFile(blob, filename, authToken);
+        await this.uploadSmallFile(blob, filename, authToken, uploadId);
       } else {
         // Large file - use multipart upload
         console.log('Using multipart upload for large file');
-        await this.uploadLargeFile(blob, filename, authToken);
+        await this.uploadLargeFile(blob, filename, authToken, uploadId);
       }
 
       // Reset status text after successful upload
@@ -574,8 +1004,9 @@ class RecordingApp {
     }
   }
 
-  async uploadSmallFile(blob, filename, authToken) {
+  async uploadSmallFile(blob, filename, authToken, uploadId) {
     this.statusText.textContent = 'Preparing upload...';
+    this.updateUploadProgress(uploadId, 10, 'uploading');
     
     // Convert blob to base64
     const arrayBuffer = await blob.arrayBuffer();
@@ -587,30 +1018,34 @@ class RecordingApp {
     }
     base64 = btoa(base64);
 
-    this.statusText.textContent = 'Uploading - 0%';
+    this.statusText.textContent = 'Uploading - 50%';
+    this.updateUploadProgress(uploadId, 50, 'uploading');
 
     // Upload using the existing upload function
     const uploadResult = await window.electronAPI.uploadRecording({
       blobData: base64,
       filename: filename,
-      apiUrl: 'https://class-capsule-2.onrender.com',
+      apiUrl: window.APP_CONFIG.API_BASE_URL,
       authToken: authToken
     });
 
     // Show completion progress
     this.statusText.textContent = 'Uploading - 100%';
+    this.updateUploadProgress(uploadId, 100, 'success');
 
     if (uploadResult.success) {
       console.log('Upload successful:', uploadResult.data);
       this.showRecordingNotification('Recording uploaded successfully!', 'success');
     } else {
+      this.updateUploadProgress(uploadId, 0, 'error');
       throw new Error(uploadResult.error || 'Upload failed');
     }
   }
 
-  async uploadLargeFile(blob, filename, authToken) {
+  async uploadLargeFile(blob, filename, authToken, uploadId) {
     try {
       this.statusText.textContent = 'Starting multipart upload...';
+      this.updateUploadProgress(uploadId, 5, 'uploading');
       
       // Start multipart upload
       const startResult = await window.electronAPI.startMultipartUpload({
@@ -621,6 +1056,7 @@ class RecordingApp {
       });
 
       if (!startResult.success) {
+        this.updateUploadProgress(uploadId, 0, 'error');
         throw new Error(startResult.error || 'Failed to start multipart upload');
       }
 
@@ -628,6 +1064,7 @@ class RecordingApp {
       console.log('UploadId:', uploadId);
 
       this.statusText.textContent = 'Generating upload URLs...';
+      this.updateUploadProgress(uploadId, 15, 'uploading');
 
       // Generate presigned URLs
       const presignedResult = await window.electronAPI.generatePresignedUrls({
@@ -638,6 +1075,7 @@ class RecordingApp {
       });
 
       if (!presignedResult.success) {
+        this.updateUploadProgress(uploadId, 0, 'error');
         throw new Error(presignedResult.error || 'Failed to generate presigned URLs');
       }
 
@@ -658,6 +1096,7 @@ class RecordingApp {
         // Update progress with simple format
         const progress = Math.round(((i + 1) / presignedUrls.length) * 100);
         this.statusText.textContent = `Uploading - ${progress}%`;
+        this.updateUploadProgress(uploadId, 20 + (progress * 0.7), 'uploading');
 
         // Convert chunk to base64
         const arrayBuffer = await chunk.arrayBuffer();
@@ -681,6 +1120,7 @@ class RecordingApp {
       }
 
       this.statusText.textContent = 'Completing upload...';
+      this.updateUploadProgress(uploadId, 90, 'uploading');
 
       // Sort parts by PartNumber to ensure correct order
       parts.sort((a, b) => a.PartNumber - b.PartNumber);
@@ -695,13 +1135,18 @@ class RecordingApp {
 
       if (completeResult.success) {
         console.log('Multipart upload completed:', completeResult.data);
+        this.updateUploadProgress(uploadId, 100, 'success');
         this.showRecordingNotification('Recording uploaded successfully!', 'success');
       } else {
+        this.updateUploadProgress(uploadId, 0, 'error');
         throw new Error(completeResult.error || 'Failed to complete multipart upload');
       }
 
     } catch (error) {
       console.error('Multipart upload failed:', error);
+      if (uploadId) {
+        this.updateUploadProgress(uploadId, 0, 'error');
+      }
       throw error;
     }
   }
@@ -987,6 +1432,192 @@ class RecordingApp {
   hideRecordingOverlay() {
     window.electronAPI.hideRecordingOverlay();
     console.log('Recording overlay hidden');
+  }
+
+  updateRecordingModeUI() {
+    const selectedMode = document.querySelector('input[name="recording-mode"]:checked').value;
+    
+    // Update button text based on selected mode
+    if (selectedMode === 'audio-only') {
+      this.startRecordingBtn.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,10C19,13.53 16.39,16.44 13,16.9V20H15A1,1 0 0,1 16,21A1,1 0 0,1 15,22H9A1,1 0 0,1 8,21A1,1 0 0,1 9,20H11V16.9C7.61,16.44 5,13.53 5,10H7A5,5 0 0,0 12,15A5,5 0 0,0 17,10H19Z"/>
+        </svg>
+        Start Audio Recording
+      `;
+    } else {
+      this.startRecordingBtn.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M8.5,8.64L13.77,12L8.5,15.36V8.64M6.5,5V19L17.5,12"/>
+        </svg>
+        Start Recording
+      `;
+    }
+    
+    console.log('Recording mode updated:', selectedMode);
+  }
+
+  saveRecordingModePreference() {
+    const selectedMode = document.querySelector('input[name="recording-mode"]:checked').value;
+    
+    try {
+      localStorage.setItem('recordingMode', selectedMode);
+      console.log('Recording mode preference saved:', selectedMode);
+    } catch (error) {
+      console.error('Failed to save recording mode preference:', error);
+    }
+  }
+
+  loadRecordingModePreference() {
+    try {
+      const savedMode = localStorage.getItem('recordingMode');
+      if (savedMode) {
+        const radioButton = document.querySelector(`input[name="recording-mode"][value="${savedMode}"]`);
+        if (radioButton) {
+          radioButton.checked = true;
+          this.updateRecordingModeUI();
+          console.log('Recording mode preference loaded:', savedMode);
+        }
+      } else {
+        // Default to video-audio
+        const defaultRadio = document.querySelector('input[name="recording-mode"][value="video-audio"]');
+        if (defaultRadio) {
+          defaultRadio.checked = true;
+          this.updateRecordingModeUI();
+          console.log('Using default recording mode: video-audio');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load recording mode preference:', error);
+      // Fallback to default
+      const defaultRadio = document.querySelector('input[name="recording-mode"][value="video-audio"]');
+      if (defaultRadio) {
+        defaultRadio.checked = true;
+        this.updateRecordingModeUI();
+      }
+    }
+  }
+
+  getSelectedRecordingMode() {
+    const selectedMode = document.querySelector('input[name="recording-mode"]:checked');
+    return selectedMode ? selectedMode.value : 'video-audio';
+  }
+  
+  // Upload Status Management
+  addUploadItem(uploadData) {
+    const uploadId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const uploadItem = {
+      id: uploadId,
+      filename: uploadData.filename,
+      status: 'uploading',
+      progress: 0,
+      size: uploadData.size || 0,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Add to UI only (no localStorage persistence)
+    this.renderUploadItem(uploadItem);
+    
+    return uploadId;
+  }
+  
+  updateUploadProgress(uploadId, progress, status = 'uploading') {
+    // Update UI only (no localStorage persistence)
+    this.updateUploadItemUI(uploadId, progress, status);
+  }
+  
+  renderUploadItem(uploadItem) {
+    if (!this.uploadList) return;
+    
+    const uploadElement = document.createElement('div');
+    uploadElement.className = 'upload-item';
+    uploadElement.id = `upload-item-${uploadItem.id}`;
+    
+    const fileSize = this.formatFileSize(uploadItem.size);
+    const uploadTime = this.formatUploadTime(new Date(uploadItem.timestamp));
+    
+    uploadElement.innerHTML = `
+      <div class="upload-item-header">
+        <div class="upload-filename" title="${uploadItem.filename}">${uploadItem.filename}</div>
+        <div class="upload-status ${uploadItem.status}">${this.getStatusText(uploadItem.status)}</div>
+      </div>
+      <div class="upload-progress">
+        <div class="upload-progress-bar" style="width: ${uploadItem.progress}%"></div>
+      </div>
+      <div class="upload-details">
+        <span class="upload-time">${uploadTime}</span>
+        <span class="upload-size">${fileSize}</span>
+      </div>
+    `;
+    
+    this.uploadList.insertBefore(uploadElement, this.uploadList.firstChild);
+  }
+  
+  updateUploadItemUI(uploadId, progress, status) {
+    const uploadElement = document.getElementById(`upload-item-${uploadId}`);
+    if (!uploadElement) return;
+    
+    const progressBar = uploadElement.querySelector('.upload-progress-bar');
+    const statusElement = uploadElement.querySelector('.upload-status');
+    
+    if (progressBar) {
+      progressBar.style.width = `${progress}%`;
+    }
+    
+    if (statusElement) {
+      statusElement.className = `upload-status ${status}`;
+      statusElement.textContent = this.getStatusText(status);
+    }
+  }
+  
+  getStatusText(status) {
+    switch (status) {
+      case 'uploading': return 'Uploading...';
+      case 'success': return 'Uploaded';
+      case 'error': return 'Failed';
+      default: return 'Unknown';
+    }
+  }
+  
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+  
+  formatUploadTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    
+    return date.toLocaleDateString();
+  }
+  
+
+  
+  clearUploadHistory() {
+    if (confirm('Are you sure you want to clear all upload history?')) {
+      if (this.uploadList) {
+        this.uploadList.innerHTML = '';
+      }
+      console.log('Upload history cleared');
+    }
+  }
+  
+  loadUploadHistory() {
+    // No persistence - just clear the list
+    if (this.uploadList) {
+      this.uploadList.innerHTML = '';
+    }
   }
 }
 

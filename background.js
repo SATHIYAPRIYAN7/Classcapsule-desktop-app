@@ -186,6 +186,12 @@ async function handleUploadRecording(request, sendResponse) {
     // Create FormData and append blob with filename
     const formData = new FormData();
     formData.append('file', blob, request.filename || `recording-${Date.now()}.webm`);
+    
+    // Add recording type metadata if provided
+    if (request.recordingMode) {
+      formData.append('recordingType', request.recordingMode);
+      console.log('Recording mode:', request.recordingMode);
+    }
 
     // Prepare headers
     const headers = {};
