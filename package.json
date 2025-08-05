@@ -61,9 +61,7 @@
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": "Info.plist",
       "category": "public.app-category.productivity",
-      "gatekeeperAssess": false,
-      "NSMicrophoneUsageDescription": "Please give us access to your microphone",
-       "com.apple.security.device.audio-input": true
+      "gatekeeperAssess": false
     },
     "linux": {
       "target": "AppImage",
