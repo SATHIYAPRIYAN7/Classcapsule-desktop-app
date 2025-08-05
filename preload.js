@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   
+  // External links
+  openExternalLink: (url) => ipcRenderer.invoke('open-external-link', url),
+  
   // Recording overlay
   showRecordingOverlay: () => ipcRenderer.invoke('show-recording-overlay'),
   hideRecordingOverlay: () => ipcRenderer.invoke('hide-recording-overlay'),

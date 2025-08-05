@@ -1,9 +1,41 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, session } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, systemPreferences, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
 const config = require('./config');
-const store = new Store();
+const store = new Store({
+  name: 'classcapsule-config',
+  defaults: {
+    authToken: null
+  }
+});
+
+// Disable problematic caches to fix access denied errors
+app.commandLine.appendSwitch('--disable-gpu-cache');
+app.commandLine.appendSwitch('--disable-application-cache');
+app.commandLine.appendSwitch('--disable-offline-load-stale-cache');
+app.commandLine.appendSwitch('--disable-disk-cache');
+app.commandLine.appendSwitch('--disable-media-cache');
+app.commandLine.appendSwitch('--disable-http-cache');
+app.commandLine.appendSwitch('--disable-background-timer-throttling');
+app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('--disable-features', 'TranslateUI');
+app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+
+// Additional cache fixes for Windows
+app.commandLine.appendSwitch('--disable-gpu-sandbox');
+app.commandLine.appendSwitch('--disable-software-rasterizer');
+app.commandLine.appendSwitch('--disable-dev-shm-usage');
+app.commandLine.appendSwitch('--no-sandbox');
+app.commandLine.appendSwitch('--disable-web-security');
+app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor');
+
+// Set custom cache directory to avoid permission issues
+const userDataPath = app.getPath('userData');
+const cachePath = path.join(userDataPath, 'Cache');
+app.commandLine.appendSwitch('--disk-cache-dir', cachePath);
+app.commandLine.appendSwitch('--media-cache-dir', cachePath);
 
 let mainWindow;
 let recordingWindow = null;
@@ -97,6 +129,9 @@ function createRecordingOverlayWindow() {
 
 // Handle app lifecycle
 app.whenReady().then(() => {
+  // Clear cache to prevent access denied errors
+  session.defaultSession.clearCache();
+  
   // Set permissions for screen capture and microphone
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     console.log('Permission requested:', permission);
@@ -113,6 +148,13 @@ app.whenReady().then(() => {
   // macOS-specific setup for microphone permissions
   if (process.platform === 'darwin') {
     console.log('Setting up macOS-specific permissions...');
+    
+    // Request microphone permissions using systemPreferences
+    systemPreferences.askForMediaAccess('microphone').then((granted) => {
+      console.log('Microphone permission granted:', granted);
+    }).catch((error) => {
+      console.error('Error requesting microphone permission:', error);
+    });
     
     // Request microphone permissions early
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -152,6 +194,7 @@ app.on('window-all-closed', () => {
 // IPC Handlers for authentication
 ipcMain.handle('get-auth-token', async () => {
   const token = store.get('authToken');
+  console.log('🔍 Getting auth token from store:', token ? token.substring(0, 20) + '...' : 'null');
   return { success: true, token: token || null };
 });
 
@@ -159,11 +202,14 @@ ipcMain.handle('set-auth-token', async (event, token) => {
   try {
     if (token === null) {
       store.delete('authToken');
+      console.log('🗑️ Deleted auth token from store');
     } else {
       store.set('authToken', token);
+      console.log('💾 Saved auth token to store:', token.substring(0, 20) + '...');
     }
     return { success: true };
   } catch (error) {
+    console.error('❌ Error saving auth token:', error);
     return { success: false, error: error.message };
   }
 });
@@ -692,6 +738,17 @@ ipcMain.handle('minimize-window', () => {
 ipcMain.handle('close-window', () => {
   if (mainWindow) {
     mainWindow.close();
+  }
+});
+
+// IPC Handler for opening external links
+ipcMain.handle('open-external-link', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open external link:', error);
+    return { success: false, error: error.message };
   }
 });
 

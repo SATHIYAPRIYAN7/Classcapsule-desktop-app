@@ -497,6 +497,32 @@
       display: none;
     }
     
+    /* Auth section visibility */
+    .auth-section {
+      display: block;
+    }
+    
+    /* Hide auth section when authenticated */
+    .authenticated .auth-section {
+      display: none;
+    }
+    
+    /* Smooth transitions for authentication state changes */
+    .auth-section,
+    .recording-controls,
+    .upload-status-section {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    
+    .auth-section.hidden,
+    .recording-controls.hidden,
+    .upload-status-section.hidden {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    
+    /* Loading state - removed to prevent pointer event issues */
+    
     .recording-controls .secondary-controls {
       display: flex;
     }
@@ -508,6 +534,46 @@
       padding: 20px;
       margin-top: 20px;
       border: 2px solid #f3f4f6;
+    }
+    
+    /* CTA Section */
+    .cta-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+    }
+    
+    .cta-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+    
+    .cta-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+      color: white;
+      text-decoration: none;
+    }
+    
+    .cta-link:active {
+      transform: translateY(0);
+    }
+    
+    .cta-link .icon {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
     }
     
     .section-header {
@@ -541,8 +607,17 @@
     }
     
     .upload-list {
-      max-height: 200px;
+      max-height: 180px;
       overflow-y: auto;
+    }
+    
+    .upload-list:empty::after {
+      content: 'No recordings yet';
+      display: block;
+      text-align: center;
+      color: #9ca3af;
+      font-style: italic;
+      padding: 20px;
     }
     
     .upload-item {
@@ -1088,6 +1163,16 @@
         </div>
         <div id="upload-list" class="upload-list">
           <!-- Upload items will be dynamically added here -->
+        </div>
+        
+        <!-- CTA Link to ClassCapsule Demo -->
+        <div class="cta-section">
+          <a href="https://class-capsule-demo.netlify.app/" target="_blank" class="cta-link">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path d="M14,3V7H17.59L7.76,16.83L9.17,18.24L19,8.41V12H21V3M19,19H5V5H12V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/>
+            </svg>
+            Visit ClassCapsule
+          </a>
         </div>
       </div>
     </div>

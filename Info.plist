@@ -8,5 +8,21 @@
 
     <key>NSMicrophoneUsageDescription</key>
     <string>This app requires access to the microphone to record audio during screen captures.</string>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+     <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.bluetooth</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    <key>com.apple.security.device.print</key>
+    <true/>
+    <key>com.apple.security.device.usb</key>
+    <true/>
+    <key>com.apple.security.personal-information.location</key>
+    <true/>
   </dict>
 </plist>

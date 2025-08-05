@@ -8,15 +8,87 @@ class RecordingApp {
     this.recordedChunks = [];
     this.screenStream = null;
     this.micStream = null;
+    this.isInitialLoad = true;
     
     this.initializeElements();
     this.initializeEventListeners();
     this.initializeElectronListeners();
-    this.checkAuthStatus();
-    this.loadAudioPreferences();
-    this.loadRecordingModePreference();
-    this.loadUploadHistory();
-    this.testScreenRecordingAPIs();
+    
+    // Hide auth section initially to prevent flash
+    this.authSection.style.display = 'none';
+    this.recordingControls.style.display = 'none';
+    
+    // Start initialization immediately without loading state
+    this.initializeApp();
+  }
+
+  async initializeApp() {
+    // Check authentication status first (fast operation)
+    await this.checkAuthStatus();
+    
+    // If authenticated, show recording controls immediately
+    if (this.isAuthenticated) {
+      console.log('🚀 User is authenticated, showing recording controls immediately');
+      
+      // Load other preferences in background (non-blocking)
+      setTimeout(() => {
+        this.loadAudioPreferences();
+        this.loadRecordingModePreference();
+        this.loadUploadHistory();
+        this.testScreenRecordingAPIs();
+      }, 100);
+    } else {
+      // Show loading state only if not authenticated
+      this.showLoadingState();
+      
+      // Load preferences and history
+      this.loadAudioPreferences();
+      this.loadRecordingModePreference();
+      this.loadUploadHistory();
+      this.testScreenRecordingAPIs();
+      
+      // Hide loading state
+      this.hideLoadingState();
+    }
+
+
+  }
+
+  showLoadingState() {
+    // Add loading class to body with reduced opacity only
+    document.body.classList.add('loading');
+  }
+
+  hideLoadingState() {
+    // Remove loading class from body
+    document.body.classList.remove('loading');
+  }
+
+  // Test method for debugging token persistence
+  async testTokenPersistence() {
+    console.log('🧪 Testing token persistence...');
+    
+    // Check current token
+    const currentToken = await this.debugTokenStorage();
+    
+    if (currentToken && currentToken.token) {
+      console.log('✅ Token exists, testing re-authentication...');
+      
+      // Simulate app restart by clearing authentication state
+      this.isAuthenticated = false;
+      this.authSection.style.display = 'block';
+      this.recordingControls.style.display = 'none';
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check authentication again
+      await this.checkAuthStatus();
+      
+      console.log('🧪 Token persistence test completed');
+    } else {
+      console.log('❌ No token found for persistence test');
+    }
   }
 
   initializeElements() {
@@ -117,6 +189,15 @@ class RecordingApp {
       });
     }
     
+    // CTA link event listener
+    const ctaLink = document.querySelector('.cta-link');
+    if (ctaLink) {
+      ctaLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.electronAPI.openExternalLink('https://class-capsule-demo.netlify.app/');
+      });
+    }
+    
     // Window control event listeners
     const minimizeBtn = document.getElementById('minimize-btn');
     const closeBtn = document.getElementById('close-btn');
@@ -177,11 +258,12 @@ class RecordingApp {
   async checkAuthStatus() {
     try {
       const result = await window.electronAPI.getAuthToken();
+      
       if (result.success && result.token) {
+        console.log('✅ Token found, authenticating user');
         this.setAuthenticated(true);
-        console.log('✅ Token loaded from storage:', result.token.substring(0, 20) + '...');
       } else {
-        console.log('ℹ️ No token found in storage');
+        console.log('ℹ️ No token found, showing login screen');
         this.setAuthenticated(false);
       }
     } catch (error) {
@@ -190,13 +272,92 @@ class RecordingApp {
     }
   }
 
+  // Debug method to check token persistence
+  async debugTokenStorage() {
+    try {
+      const result = await window.electronAPI.getAuthToken();
+      console.log('🔍 Debug - Token storage check:', {
+        success: result.success,
+        hasToken: !!result.token,
+        tokenLength: result.token ? result.token.length : 0,
+        tokenPreview: result.token ? result.token.substring(0, 20) + '...' : 'null'
+      });
+      
+      // Also log the current authentication state
+      console.log('🔍 Debug - Current auth state:', {
+        isAuthenticated: this.isAuthenticated,
+        authSectionDisplay: this.authSection.style.display,
+        recordingControlsDisplay: this.recordingControls.style.display
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Debug - Token storage error:', error);
+      return null;
+    }
+  }
+
+  async validateToken(token) {
+    try {
+      const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/auth/validate`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error('❌ Token validation failed:', error);
+      return false;
+    }
+  }
+
   setAuthenticated(authenticated) {
     this.isAuthenticated = authenticated;
     document.body.classList.toggle('authenticated', authenticated);
+    document.body.classList.toggle('show-auth', !authenticated);
     
     if (authenticated) {
-      this.showMessage('login', 'Welcome to ClassCapsule Recorder!', 'success');
+      // Show recording controls immediately
+      this.recordingControls.style.display = 'block';
+      
+      // Clear any existing messages
+      this.clearMessages();
+      
+      // Show welcome message (only if not initial load)
+      if (!this.isInitialLoad) {
+        this.showMessage('login', 'Welcome to ClassCapsule Recorder!', 'success');
+      }
+      
+      // Clear form inputs
+      this.emailInput.value = '';
+      this.passwordInput.value = '';
+      this.tokenInput.value = '';
+      
+      console.log('✅ User authenticated, showing recording controls');
+    } else {
+      // Show auth section
+      this.authSection.style.display = 'block';
+      this.recordingControls.style.display = 'none';
+      
+      // Clear any existing messages
+      this.clearMessages();
+      
+      console.log('ℹ️ User not authenticated, showing login screen');
     }
+    
+    // Mark that initial load is complete
+    this.isInitialLoad = false;
+  }
+
+  clearMessages() {
+    const messages = document.querySelectorAll('.message');
+    messages.forEach(msg => {
+      msg.classList.add('hidden');
+      msg.textContent = '';
+    });
   }
 
   showMessage(type, message, className = 'error') {
@@ -255,6 +416,8 @@ class RecordingApp {
       const data = await response.json();
       
       if (data.access_token) {
+        console.log('🔑 Received access token from server');
+        
         // Save token using Electron API
         const saveResult = await window.electronAPI.setAuthToken(data.access_token);
         if (saveResult.success) {
@@ -277,7 +440,6 @@ class RecordingApp {
       this.showMessage('login', error.message || 'Login failed. Please try again.');
     } finally {
       this.setButtonLoading(this.loginBtn, false);
-      window.location.reload();
     }
   }
 
@@ -296,7 +458,8 @@ class RecordingApp {
       
       const result = await window.electronAPI.setAuthToken(token);
       if (result.success) {
-        this.showMessage('token', 'Token saved successfully!', 'success');
+        console.log('✅ Token saved successfully');
+        this.showMessage('token', 'Token saved successfully! Welcome to ClassCapsule.', 'success');
         this.setAuthenticated(true);
       } else {
         throw new Error(result.error || 'Failed to save token');
@@ -1005,7 +1168,7 @@ class RecordingApp {
   }
 
   async uploadSmallFile(blob, filename, authToken, uploadId) {
-    this.statusText.textContent = 'Preparing upload...';
+   // this.statusText.textContent = 'Preparing upload...';
     this.updateUploadProgress(uploadId, 10, 'uploading');
     
     // Convert blob to base64
@@ -1018,7 +1181,7 @@ class RecordingApp {
     }
     base64 = btoa(base64);
 
-    this.statusText.textContent = 'Uploading - 50%';
+    //this.statusText.textContent = 'Uploading - 50%';
     this.updateUploadProgress(uploadId, 50, 'uploading');
 
     // Upload using the existing upload function
@@ -1030,7 +1193,7 @@ class RecordingApp {
     });
 
     // Show completion progress
-    this.statusText.textContent = 'Uploading - 100%';
+    //this.statusText.textContent = 'Uploading - 100%';
     this.updateUploadProgress(uploadId, 100, 'success');
 
     if (uploadResult.success) {
@@ -1044,7 +1207,7 @@ class RecordingApp {
 
   async uploadLargeFile(blob, filename, authToken, uploadId) {
     try {
-      this.statusText.textContent = 'Starting multipart upload...';
+      //this.statusText.textContent = 'Starting multipart upload...';
       this.updateUploadProgress(uploadId, 5, 'uploading');
       
       // Start multipart upload
@@ -1063,7 +1226,7 @@ class RecordingApp {
       const { uploadId } = startResult.data;
       console.log('UploadId:', uploadId);
 
-      this.statusText.textContent = 'Generating upload URLs...';
+      //this.statusText.textContent = 'Generating upload URLs...';
       this.updateUploadProgress(uploadId, 15, 'uploading');
 
       // Generate presigned URLs
@@ -1095,7 +1258,7 @@ class RecordingApp {
 
         // Update progress with simple format
         const progress = Math.round(((i + 1) / presignedUrls.length) * 100);
-        this.statusText.textContent = `Uploading - ${progress}%`;
+       // this.statusText.textContent = `Uploading - ${progress}%`;
         this.updateUploadProgress(uploadId, 20 + (progress * 0.7), 'uploading');
 
         // Convert chunk to base64
@@ -1119,7 +1282,7 @@ class RecordingApp {
         console.log(`Part ${i + 1} uploaded successfully`);
       }
 
-      this.statusText.textContent = 'Completing upload...';
+     // this.statusText.textContent = 'Completing upload...';
       this.updateUploadProgress(uploadId, 90, 'uploading');
 
       // Sort parts by PartNumber to ensure correct order
@@ -1550,7 +1713,11 @@ class RecordingApp {
       </div>
     `;
     
+    // Add the new item at the beginning
     this.uploadList.insertBefore(uploadElement, this.uploadList.firstChild);
+    
+    // Keep only the latest 2 recordings
+    this.limitUploadItemsToLatest(2);
   }
   
   updateUploadItemUI(uploadId, progress, status) {
@@ -1567,6 +1734,25 @@ class RecordingApp {
     if (statusElement) {
       statusElement.className = `upload-status ${status}`;
       statusElement.textContent = this.getStatusText(status);
+    }
+  }
+
+  limitUploadItemsToLatest(maxItems) {
+    if (!this.uploadList) return;
+    
+    const uploadItems = this.uploadList.querySelectorAll('.upload-item');
+    
+    // If we have more than maxItems, remove the oldest ones
+    if (uploadItems.length > maxItems) {
+      const itemsToRemove = uploadItems.length - maxItems;
+      
+      // Remove the oldest items (they are at the bottom of the list)
+      for (let i = 0; i < itemsToRemove; i++) {
+        const lastItem = uploadItems[uploadItems.length - 1 - i];
+        if (lastItem) {
+          lastItem.remove();
+        }
+      }
     }
   }
   
@@ -1623,5 +1809,10 @@ class RecordingApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new RecordingApp();
-}); 
+  window.recordingApp = new RecordingApp();
+  
+  // Expose debug methods globally for testing
+  window.debugTokenPersistence = () => window.recordingApp.testTokenPersistence();
+  window.debugTokenStorage = () => window.recordingApp.debugTokenStorage();
+  window.checkAuthStatus = () => window.recordingApp.checkAuthStatus();
+});

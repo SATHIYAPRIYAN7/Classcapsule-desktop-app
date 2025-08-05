@@ -56,12 +56,14 @@
       "target": ["dmg", "zip"],
       "icon": "assets/logo-class-capsule.png",
       "publish": null,
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": "Info.plist",
       "category": "public.app-category.productivity",
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "NSMicrophoneUsageDescription": "Please give us access to your microphone",
+       "com.apple.security.device.audio-input": true
     },
     "linux": {
       "target": "AppImage",
